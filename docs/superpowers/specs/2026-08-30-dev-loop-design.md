@@ -2,7 +2,7 @@
 
 Date: 2026-08-30
 Status: implemented
-Repo: `mac-ai-setup`
+Repo: `dev-conductor`
 
 ## Goal
 

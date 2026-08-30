@@ -4,7 +4,7 @@ Installed to `~/.claude/skills/` by `./claude/prompt-enrich/install-skills.sh`.
 
 **Lazy.** Descriptions are a small catalog tax; bodies load when relevant. Do not paste these into `CLAUDE.md`.
 
-Source of truth is this directory. Cursor copies live in `cursor/dev-loop/skills/` — do not edit `skills/` only to make Cursor work; edit here, then re-run `cursor/dev-loop/install.sh`.
+Source of truth is this directory. Plugin and Cursor install from here (`plugins/dev-loop/skills` is a symlink; Cursor `install.sh` copies these folders).
 
 ## Loop
 
@@ -33,10 +33,6 @@ Source of truth is this directory. Cursor copies live in `cursor/dev-loop/skills
 ## Prompt-enrich (grill)
 
 `prompt-contract`, `design-tree-interview`, `grill-plan`, `grill-plan-docs`, `session-handoff`, `domain-glossary`, `restate-plain`, `grill-deep-ask`
-
-## Not in this repo
-
-Product/design skills (`frontend-design`, `tutorial-writer`, `ase-lifecycle`, `find-skills`, `skill-author`) live in `~/dev/mac-ai-setup`. Cursor-product skills come from Cursor plugins.
 
 ## Agents
 

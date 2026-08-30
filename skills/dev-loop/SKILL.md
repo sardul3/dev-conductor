@@ -13,7 +13,7 @@ If the user did not pass `--repo` and the current directory is not a git repo un
 
 1. Run `python3 ~/.claude/hooks/dev-loop/cli.py repos` and read the JSON.
 2. **Ask the user with a dropdown** (Cursor: AskQuestion). Options: every `candidates[].label` (id = `path`) plus one extra option id `__create__` labeled with `create_label`.
-3. Never pick `mac-ai-setup` or any other folder unless the user selected it.
+3. Never pick a folder unless the user selected it.
 4. If they choose `__create__`, ask for a folder name, then:
    `python3 ~/.claude/hooks/dev-loop/cli.py init-repo NAME`
    Use the printed path as `--repo`.

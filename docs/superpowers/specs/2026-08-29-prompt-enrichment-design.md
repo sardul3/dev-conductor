@@ -2,7 +2,7 @@
 
 Date: 2026-08-29  
 Status: implemented (unit tests + install; Claude Code round-trip still needed)  
-Repo: `mac-ai-setup`  
+Repo: `dev-conductor`  
 Approved in chat: thin classifier hook; **own** design-tree interview + handoff skills (not the mattpocock plugin); dual CCR/Anthropic model routing; layered CLAUDE.md; Auto-run on new tasks only.
 
 ## 1. Goal

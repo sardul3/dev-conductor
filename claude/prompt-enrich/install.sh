@@ -42,14 +42,6 @@ python3 "${HOOK_SRC}/merge_settings.py" \
   --after-launch "python3 ${HOOK_DEST}/after_launch.py" \
   --session-start "bash ${HOOK_DEST}/ensure_prompt_log_proxy.sh"
 
-# Lean CLAUDE.md + path-scoped rules (Java/ML/LLM/TS/k8s). No-op if memory/ was moved to mac-ai-setup.
-if [[ -x "${ROOT}/claude/memory/install.sh" ]]; then
-  "${ROOT}/claude/memory/install.sh"
-elif [[ ! -f "${HOME}/.claude/CLAUDE.md" && -f "${ROOT}/claude/memory/user.CLAUDE.md" ]]; then
-  cp "${ROOT}/claude/memory/user.CLAUDE.md" "${HOME}/.claude/CLAUDE.md"
-  echo "wrote ~/.claude/CLAUDE.md (lean user layer)"
-fi
-
 echo
 echo "prompt-enrich installed."
 echo "  hook: ${CLASSIFY}"

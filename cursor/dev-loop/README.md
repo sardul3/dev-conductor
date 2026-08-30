@@ -1,8 +1,8 @@
-# Cursor port of dev-loop
+# Cursor port of /dev-loop
 
-**Do not modify** `skills/`, `claude/commands/`, or Claude hooks to “make Cursor work.” Change files under `cursor/dev-loop/` only.
+Unique to Cursor: this `install.sh` and `rules/dev-loop.mdc`.
 
-The conductor is the same Python CLI. Cursor-specific: extra SKILL.md notes and a non-always-on rule.
+Skill text is **not** copied here. Source of truth is `../../skills/`. Install copies from there into `~/.cursor/skills` and `~/.agents/skills`.
 
 ```bash
 ./cursor/dev-loop/install.sh

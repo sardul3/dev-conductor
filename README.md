@@ -1,10 +1,8 @@
 # dev-conductor
 
-Jira-to-PR conductor for Claude Code (plugin + hooks + skills + agents) and a Cursor **copy** of the same loop skills.
+Jira REST → spec → tests → TDD → verify → review → `gh pr`. Claude Code plugin plus a Cursor install of the same skills. No Jira or GitHub MCP.
 
 https://github.com/sardul3/dev-conductor
-
-Not a machine snapshot. SSH, homelab, OpenRouter, Cursor product settings, and path-scoped stack rules live in sibling **`~/dev/mac-ai-setup`**.
 
 ## Install
 
@@ -14,35 +12,41 @@ cd dev-conductor
 ./install.sh
 ```
 
-Fills `~/.claude/hooks/dev-loop/`, merges SessionStart / PreToolUse, installs loop skills and agents, prompt-enrich (spec grill + launch), and the Cursor port (`~/.cursor/skills` + `~/.agents/skills`).
+Installs the CLI to `~/.claude/hooks/dev-loop/`, the `/dev-loop` slash command, loop skills and agents, prompt-enrich (spec grill), and the Cursor port (`~/.cursor/skills`, `~/.agents/skills`).
 
-Config: `~/.config/dev-conductor/dev-loop/config.yaml`  
-Secrets: `~/.config/dev-conductor/secrets.env` (`ATLASSIAN_*`). Never commit.
+```bash
+claude plugin marketplace add /path/to/dev-conductor
+```
 
 ## Use
 
 ```bash
 /dev-loop PROJ-123
 # or
-python3 ~/.claude/hooks/dev-loop/cli.py start PROJ-123 --repo ~/dev/your-app
+python3 ~/.claude/hooks/dev-loop/cli.py start PROJ-123 --repo /path/to/repo
 ```
 
-Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml eval --repo ~/dev/devloop-lab`
+Config: `~/.config/dev-conductor/dev-loop/config.yaml`  
+Secrets: `~/.config/dev-conductor/secrets.env` (`ATLASSIAN_*`). Never commit.
 
-## What ships
+Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml eval --repo /path/to/lab-repo`
+
+## Layout
 
 | Path | Contents |
 | ---- | -------- |
-| `dev-loop/` | CLI, config, fake-jira, tests |
-| `plugins/dev-loop/` | Claude Code plugin wrapper |
-| `skills/` | Loop + prompt-enrich skills (source of truth) |
+| `dev-loop/` | Conductor CLI, config, fake-jira, tests |
+| `plugins/dev-loop/` | Claude plugin (`skills` / `agents` / `commands` symlink to sources) |
+| `skills/` | Loop + grill skills |
 | `claude/agents/` | `code-reviewer`, `debugger`, `code-simplifier` |
-| `claude/commands/dev-loop.md` | Slash command |
-| `claude/prompt-enrich/` | Grill + launch (used by spec stage; optional if you only run the CLI) |
-| `cursor/dev-loop/` | Cursor copies — do not edit `skills/` only for Cursor |
-| `docs/` | Loop and prompt-enrich specs |
+| `claude/commands/dev-loop.md` | `/dev-loop` |
+| `claude/prompt-enrich/` | Spec grill + launch |
+| `cursor/dev-loop/` | Cursor `install.sh` + `dev-loop.mdc` |
 | `install.sh` | One-shot install |
 
-Claude plugin: `.claude-plugin/marketplace.json` → `plugins/dev-loop`.
+## Tests
 
-**Not in this repo:** SSH, homelab, IdentityIQ lab, OpenRouter/CCR dumps, Cursor `settings.json`, path-scoped Java/ML/LLM rules.
+```bash
+python3 -m unittest discover -s dev-loop/tests -v
+python3 -m unittest discover -s claude/prompt-enrich/tests -v
+```

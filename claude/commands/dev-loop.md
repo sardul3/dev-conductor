@@ -8,7 +8,7 @@ If `--repo` is missing and cwd is not a git repo under `~/dev`, **do not guess**
 python3 ~/.claude/hooks/dev-loop/cli.py repos
 ```
 
-Then ask the user with a **dropdown**: each candidate path plus “Create a new folder/repo under ~/dev”. Never default to mac-ai-setup. After they pick:
+Then ask the user with a **dropdown**: each candidate path plus “Create a new folder/repo”. Do not guess a repo. After they pick:
 
 ```bash
 python3 ~/.claude/hooks/dev-loop/cli.py start KEY --repo PATH

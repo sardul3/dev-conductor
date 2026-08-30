@@ -7,8 +7,8 @@ RULES="${HOME}/.cursor/rules"
 mkdir -p "${DEST}" "${AGENTS}" "${RULES}"
 for n in dev-loop story-spec test-writer repo-memory dev-loop-review pr-comment-fixer jira-progress tdd implement-terse verify-before-done systematic-debugging code-review; do
   rm -rf "${DEST}/${n}" "${AGENTS}/${n}"
-  cp -R "${ROOT}/cursor/dev-loop/skills/${n}" "${DEST}/${n}"
-  cp -R "${ROOT}/cursor/dev-loop/skills/${n}" "${AGENTS}/${n}"
+  cp -R "${ROOT}/skills/${n}" "${DEST}/${n}"
+  cp -R "${ROOT}/skills/${n}" "${AGENTS}/${n}"
   echo "cursor skill ${n}"
 done
 cp "${ROOT}/cursor/dev-loop/rules/dev-loop.mdc" "${RULES}/dev-loop.mdc"

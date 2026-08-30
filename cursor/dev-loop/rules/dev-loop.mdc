@@ -9,6 +9,6 @@ Cursor has no Claude SessionStart. Run the shared CLI (Claude constructs stay in
 python3 ~/.claude/hooks/dev-loop/cli.py start KEY --repo PATH
 ```
 
-Config: `~/.config/dev-conductor/dev-loop/config.yaml`. Skills copies live in `cursor/dev-loop/skills/`.
+Config: `~/.config/dev-conductor/dev-loop/config.yaml`. Skills: repo `skills/` (installed to `~/.cursor/skills`).
 
 Poller: `python3 ~/.claude/hooks/dev-loop/cli.py poll` / `install-poller`. Real Jira: ATLASSIAN_* in secrets.env.
