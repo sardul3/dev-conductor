@@ -16,6 +16,8 @@ SETTINGS="${HOME}/.claude/settings.json"
 
 mkdir -p "${HOOK_DEST}" "${CMD_DEST}" "${CFG_DEST}"
 cp "${ROOT}/dev-loop/"*.py "${HOOK_DEST}/"
+rm -rf "${HOOK_DEST}/brief"
+cp -R "${ROOT}/dev-loop/brief" "${HOOK_DEST}/brief"
 chmod +x "${HOOK_DEST}/cli.py" "${HOOK_DEST}/session_start.py" "${HOOK_DEST}/deny_impl.py" "${HOOK_DEST}/fake_jira.py"
 cp -R "${ROOT}/dev-loop/eval_templates" "${HOOK_DEST}/"
 cp -R "${ROOT}/dev-loop/testdata" "${HOOK_DEST}/"

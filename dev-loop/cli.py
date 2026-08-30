@@ -5,23 +5,28 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from brief import Document, emit, fail  # noqa: E402
+from brief.ports import (  # noqa: E402
+    HomePort,
+    InferPort,
+    KeysPort,
+    PollPort,
+    ProgressPort,
+    ReposPort,
+    StatusPort,
+    TicketPort,
+)
 from config import example_yaml, load_config  # noqa: E402
 from conductor import continue_loop, fetch_issue, require_key, require_repo, start  # noqa: E402
 from memory import index_is_fresh, load_or_build  # noqa: E402
-from paths import config_dir, run_dir, state_path  # noqa: E402
-from session_start import main as session_start_main  # noqa: E402
+from paths import run_dir  # noqa: E402
 from state import load_state  # noqa: E402
 from verify_infer import infer_recipe, run_verify  # noqa: E402
-
-
-def cmd_keys(_: argparse.Namespace) -> int:
-    return session_start_main()
 
 
 def _cfg(ns: argparse.Namespace):
@@ -29,16 +34,42 @@ def _cfg(ns: argparse.Namespace):
     return load_config(Path(path).expanduser() if path else None)
 
 
+def _fmt(ns: argparse.Namespace) -> str:
+    return str(getattr(ns, "format", None) or "brief")
+
+
+def _full(ns: argparse.Namespace) -> bool:
+    return bool(getattr(ns, "full", False))
+
+
+def _show(text: str) -> int:
+    sys.stdout.write(text if text.endswith("\n") else text + "\n")
+    return 0
+
+
+def cmd_home(ns: argparse.Namespace) -> int:
+    return _show(HomePort().view(fmt=_fmt(ns), full=_full(ns)))
+
+
+def cmd_keys(ns: argparse.Namespace) -> int:
+    return _show(KeysPort().view(cfg=_cfg(ns), fmt=_fmt(ns), full=_full(ns)))
+
+
 def cmd_start(ns: argparse.Namespace) -> int:
+    from budget import BudgetExhausted
     from pick import resolve_repo
 
     cfg = _cfg(ns)
     repo = resolve_repo(cfg, ns.repo, require=None)
-    start(ns.key, repo, cfg)
+    try:
+        start(ns.key, repo, cfg)
+    except BudgetExhausted as exc:
+        return fail(str(exc), code=2)
     return 0
 
 
 def cmd_continue(ns: argparse.Namespace) -> int:
+    from budget import BudgetExhausted
     from pick import resolve_repo
 
     cfg = _cfg(ns)
@@ -48,28 +79,50 @@ def cmd_continue(ns: argparse.Namespace) -> int:
         st = load_state()
         repo = Path(st["repo"]).expanduser() if st.get("repo") else resolve_repo(cfg, None, require=None)
     wait = not ns.no_wait
-    return continue_loop(ns.key, repo, cfg, wait=wait)
+    try:
+        return continue_loop(ns.key, repo, cfg, wait=wait)
+    except BudgetExhausted as exc:
+        return fail(str(exc), code=2)
 
 
 def cmd_repos(ns: argparse.Namespace) -> int:
     from pick import candidates_payload
 
-    print(json.dumps(candidates_payload(_cfg(ns)), indent=2))
-    return 0
+    payload = candidates_payload(_cfg(ns))
+    if _fmt(ns) == "json":
+        print(json.dumps(payload, indent=2))
+        return 0
+    return _show(ReposPort().view(payload=payload, fmt="brief", full=_full(ns)))
 
 
 def cmd_init_repo(ns: argparse.Namespace) -> int:
     from pick import init_repo
 
     dest = init_repo(_cfg(ns), ns.name)
-    print(dest)
-    return 0
+    return _show(
+        emit(
+            Document(
+                bin="cli.py",
+                description="created repo",
+                meta={"path": str(dest)},
+                help=["Run `cli.py start <key> --repo " + str(dest) + "`"],
+            ),
+            fmt=_fmt(ns),
+            full=_full(ns),
+        )
+    )
 
 
 def cmd_fetch(ns: argparse.Namespace) -> int:
     dest = fetch_issue(require_key(ns.key), _cfg(ns))
-    print(dest / "issue.json")
-    return 0
+    issue_path = dest / "issue.json"
+    issue = {}
+    if issue_path.is_file():
+        try:
+            issue = json.loads(issue_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            issue = {}
+    return _show(TicketPort().view(issue=issue, path=str(issue_path), fmt=_fmt(ns), full=_full(ns)))
 
 
 def cmd_memory(ns: argparse.Namespace) -> int:
@@ -80,12 +133,21 @@ def cmd_memory(ns: argparse.Namespace) -> int:
         from memory import regenerate
 
         mem = regenerate(repo)
-        print(f"regenerated {mem}")
-        return 0
-    mem = load_or_build(repo)
-    print(mem)
-    print("fresh" if index_is_fresh(repo) else "rebuilt")
-    return 0
+        fresh = "regenerated"
+    else:
+        mem = load_or_build(repo)
+        fresh = "fresh" if index_is_fresh(repo) else "rebuilt"
+    return _show(
+        emit(
+            Document(
+                bin="cli.py",
+                description="repo memory",
+                meta={"path": str(mem), "state": fresh},
+                help=["Run `cli.py start <key> --repo " + str(repo) + "`"],
+            ),
+            fmt=_fmt(ns),
+        )
+    )
 
 
 def cmd_verify(ns: argparse.Namespace) -> int:
@@ -97,39 +159,24 @@ def cmd_verify(ns: argparse.Namespace) -> int:
     return run_verify(repo, cfg, log)
 
 
-def cmd_status(_: argparse.Namespace) -> int:
-    from paths import run_dir
-    from progress import backfill, render_progress, load_status
-
-    st = load_state()
-    print(json.dumps(st, indent=2))
-    print("config", config_dir() / "config.yaml")
-    print("state", state_path())
-    key = st.get("ticket")
-    if key:
-        run = run_dir(str(key))
-        if run.is_dir():
-            backfill(run)
-            data = load_status(run)
-            print()
-            print(render_progress(str(key), data.get("current"), list(data.get("history") or [])))
-    return 0
+def cmd_status(ns: argparse.Namespace) -> int:
+    return _show(StatusPort().view(fmt=_fmt(ns), full=_full(ns)))
 
 
 def cmd_progress(ns: argparse.Namespace) -> int:
-    from progress import backfill
-
     key = ns.key or load_state().get("ticket")
     if not key:
-        print("dev-loop: no ticket — pass KEY or start a loop first")
-        return 2
+        return fail("no ticket — pass KEY or start a loop first", code=2)
     run = run_dir(str(key))
     if not run.is_dir():
-        print(f"dev-loop: no run dir {run}")
-        return 2
-    backfill(run)
-    print((run / "progress.md").read_text(encoding="utf-8"))
-    return 0
+        return fail(f"no run dir {run}", code=2)
+    if _full(ns):
+        from progress import backfill
+
+        backfill(run)
+        print((run / "progress.md").read_text(encoding="utf-8"))
+        return 0
+    return _show(ProgressPort().view(key=str(key), run=run, fmt=_fmt(ns), full=False))
 
 
 def cmd_infer(ns: argparse.Namespace) -> int:
@@ -137,12 +184,8 @@ def cmd_infer(ns: argparse.Namespace) -> int:
     repo = Path(ns.repo).expanduser().resolve() if ns.repo else Path.cwd()
     r = infer_recipe(repo, cfg)
     if r is None:
-        print("cannot infer")
-        return 2
-    print("test", " ".join(r.test))
-    print("build", " ".join(r.build))
-    print("health", r.health or "")
-    return 0
+        return fail("cannot infer", code=2)
+    return _show(InferPort().view(recipe=r, fmt=_fmt(ns), full=_full(ns)))
 
 
 def cmd_print_example(_: argparse.Namespace) -> int:
@@ -152,6 +195,7 @@ def cmd_print_example(_: argparse.Namespace) -> int:
 
 def cmd_eval(ns: argparse.Namespace) -> int:
     from eval_harness import run_eval
+
     return run_eval(_cfg(ns), Path(ns.repo).expanduser() if ns.repo else None)
 
 
@@ -159,16 +203,19 @@ def cmd_poll(ns: argparse.Namespace) -> int:
     from poller import poll_once
 
     actions = poll_once(_cfg(ns))
-    print("poll", " ".join(actions) if actions else "(no watched PRs)")
-    return 0
+    return _show(PollPort().view(actions=list(actions), fmt=_fmt(ns), full=_full(ns)))
 
 
 def cmd_install_poller(ns: argparse.Namespace) -> int:
     from poller import install_poller
 
     dest = install_poller(_cfg(ns), load=None if ns.load is None else bool(ns.load))
-    print(dest)
-    return 0
+    return _show(
+        emit(
+            Document(bin="cli.py", description="poller plist", meta={"path": str(dest)}),
+            fmt=_fmt(ns),
+        )
+    )
 
 
 def cmd_jira_progress(ns: argparse.Namespace) -> int:
@@ -177,15 +224,26 @@ def cmd_jira_progress(ns: argparse.Namespace) -> int:
     cfg = _cfg(ns)
     key = require_key(ns.key)
     progress(cfg, key, ns.event, ns.comment or "")
-    return 0
+    return _show(
+        emit(
+            Document(
+                bin="cli.py",
+                description="jira workflow",
+                meta={"key": key, "event": ns.event},
+            ),
+            fmt=_fmt(ns),
+        )
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dev-loop")
     p.add_argument("--config", help="config.yaml path (or DEVLOOP_CONFIG)")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p.add_argument("--format", choices=["brief", "json"], default="brief", help="agent output (default brief)")
+    p.add_argument("--full", action="store_true", help="do not clip long fields")
+    sub = p.add_subparsers(dest="cmd", required=False)
 
-    s = sub.add_parser("keys", help="SessionStart: print Jira keys")
+    s = sub.add_parser("keys", help="Open Jira keys (brief)")
     s.set_defaults(func=cmd_keys)
 
     s = sub.add_parser("start", help="Fetch issue, memory, launch spec grill")
@@ -220,7 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status")
     s.set_defaults(func=cmd_status)
 
-    s = sub.add_parser("progress", help="Named stage timeline for a ticket (progress.md)")
+    s = sub.add_parser("progress", help="Stage timeline (brief; --full for progress.md)")
     s.add_argument("key", nargs="?")
     s.set_defaults(func=cmd_progress)
 
@@ -239,7 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--no-load", action="store_false", dest="load")
     s.set_defaults(func=cmd_install_poller)
 
-    s = sub.add_parser("repos", help="List ~/dev folder/git candidates for the repo picker")
+    s = sub.add_parser("repos", help="Candidate repos (brief; --format json for the picker)")
     s.set_defaults(func=cmd_repos)
 
     s = sub.add_parser("init-repo", help="Create a new git repo under ~/dev (optional gh create)")
@@ -256,7 +314,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     ns = build_parser().parse_args(argv)
-    return int(ns.func(ns) or 0)
+    func = getattr(ns, "func", None) or cmd_home
+    return int(func(ns) or 0)
 
 
 if __name__ == "__main__":

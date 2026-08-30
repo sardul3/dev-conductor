@@ -11,7 +11,7 @@ Run the conductor. Do not use Jira MCP or GitHub MCP. Knobs live in `~/.config/d
 
 If the user did not pass `--repo` and the current directory is not a git repo under `~/dev`:
 
-1. Run `python3 ~/.claude/hooks/dev-loop/cli.py repos` and read the JSON.
+1. Run `python3 ~/.claude/hooks/dev-loop/cli.py repos --format json` and read the JSON.
 2. **Ask the user with a dropdown** (Cursor: AskQuestion). Options: every `candidates[].label` (id = `path`) plus one extra option id `__create__` labeled with `create_label`.
 3. Never pick a folder unless the user selected it.
 4. If they choose `__create__`, ask for a folder name, then:
@@ -29,5 +29,8 @@ python3 ~/.claude/hooks/dev-loop/cli.py continue KEY
 ```
 
 Poller: `cli.py poll` / `install-poller`. Never commit `main`/`master`.
+Agent reads use brief output (`cli.py` with no args, `keys`, `status`, `progress`). Picker JSON is `--format json`. New connector: `brief.Connector` + `fetch()`.
+
+Long-run caps (`caps.max_launches` / `max_tokens` / `max_budget_usd` / `wall_sec`, 0 = off) stop further agent launches and write `STOPPED` in the run dir. Unattended still needs these set; they do not default on. Parallelism is `queue.max_active` (treehouse leases), not tmux fan-out.
 
 Isolation: example config uses `git.isolation: treehouse` (leased worktree) and `queue.max_active: 3`. Start from the clone under `~/dev`; do not `cd` into `~/.treehouse` yourself. A fourth in-progress ticket exits until one ships or you `treehouse return PATH`.

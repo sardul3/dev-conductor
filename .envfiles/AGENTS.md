@@ -7,6 +7,7 @@ dev-conductor is the Jira-to-PR loop. Do not silently revert these:
 - Isolation: `git.isolation: treehouse` + `queue.max_active: 3`. Eval (`config.test.yaml`) uses `isolation: none`.
 - Secrets stay in `~/.config/dev-conductor/secrets.env`. Never commit them.
 - Procedures live in `skills/`. Stack law lives in `.envfiles/rules/` (path-scoped). Do not paste those bodies here.
+- Agent I/O is `brief/` (clip, 3–4 columns, count, empty, help[]). New connector: subclass `brief.Connector`, implement `fetch()`. Disk files stay JSON. Not AXI-branded.
 
 ## Commands
 
@@ -22,6 +23,16 @@ dev-conductor is the Jira-to-PR loop. Do not silently revert these:
 - `skills/` — loop + prompt-enrich skills
 - `claude/agents/` — `code-reviewer`, `debugger`, `code-simplifier`
 - `.envfiles/` — canonical `AGENTS.md` / `CLAUDE.md` (this file) and path-scoped `rules/`. Root pointers load this file.
+
+## Definition of done
+
+The loop already is the pipeline. Do not add a second checklist in chat.
+
+- Proof: `verify-before-done` (fresh test/build this turn). Quality gates are config (`quality.*`, `evidence`).
+- UI: `lavish.enabled` (default `auto` = UI repos only). Not a ship blocker.
+- Docs: `domain-glossary` only for a new term or a hard-to-reverse decision (`docs/adr/`). README only if install/usage/public API would be wrong. No empty ADRs.
+- Review: spawned `code-reviewer` → `verdict.json`, then `gh pr`.
+- Long runs: `caps.max_launches` / `max_tokens` / `max_budget_usd` / `wall_sec` (0 = off). Stop writes `STOPPED` in the run dir; not a second overnight product.
 
 ## Working agreements
 
