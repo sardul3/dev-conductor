@@ -14,6 +14,12 @@ cd dev-conductor
 
 Installs the CLI to `~/.claude/hooks/dev-loop/`, the `/dev-loop` slash command, loop skills and agents, prompt-enrich (spec grill), and the Cursor port (`~/.cursor/skills`, `~/.agents/skills`).
 
+Optional path-scoped stack rules (Java, Python/ML, LLM, TypeScript, k8s, …) live in `.envfiles/rules/` and are **not** always-on:
+
+```bash
+./.envfiles/install-rules.sh
+```
+
 ```bash
 claude plugin marketplace add /path/to/dev-conductor
 ```
@@ -45,7 +51,7 @@ Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml ev
 | `claude/prompt-enrich/` | Spec grill + launch |
 | `cursor/dev-loop/` | Cursor `install.sh` + `dev-loop.mdc` |
 | `install.sh` | One-shot install |
-| `.envfiles/` | Canonical `AGENTS.md` (root `CLAUDE.md` / `AGENTS.md` are pointers) |
+| `.envfiles/` | Canonical `AGENTS.md` / `CLAUDE.md` plus path-scoped `rules/` |
 
 ## Tests
 

@@ -1,0 +1,41 @@
+---
+description: LLM, RAG, and agent products. Off unless prompt/eval/RAG files are in play.
+globs: **/prompts/**,**/evals/**,**/eval/**,**/*llm*,**/*rag*
+alwaysApply: false
+---
+
+# LLM, RAG, and agent products
+
+Loads when prompt, eval, RAG, or vendor-SDK files are in play. Harness, tools, sandbox, trajectory evals, coding-agent SDLC: `agentic-development.md`.
+
+## Prompts and models
+
+- Treat prompts, tools, and model IDs as versioned interfaces. A prompt change without an eval is an untested API change.
+- Pin model slugs. Do not use floating `:latest`. Record provider, model, temperature, and max tokens in traces.
+- Prefer structured outputs (JSON schema / tool calls) over free text when downstream code parses the result.
+- System prompts must state refusal policy, tool limits, and what the model is not allowed to invent.
+
+## RAG
+
+- Chunking, embedding model, and index ID are config. Re-embed when the embedding model changes; never mix vectors from two models in one index.
+- Retrieval must be measurable: recall@k on a labeled set, empty-retrieval behavior, and citation of sources in the answer when the product claims grounding.
+- If retrieval returns nothing, refuse or say so. Do not let the model answer from parametric memory when the product is “answer from docs.”
+- Metadata filters (tenant, ACL, locale) apply before similarity search. Vector search is not an authorization layer.
+
+## Agents and tools
+
+- Tool allowlists. No unconstrained shell, SQL, or HTTP from a model in production. Each tool has a schema, timeout, and audit log.
+- Bound the loop: max steps, max tokens, wall-clock. Detect and stop cycles. Idempotent tools with an idempotency key from the workflow.
+- Human-in-the-loop for irreversible actions (email send, payment, delete, production deploy) unless the product explicitly automates that action with a signed policy.
+
+## Evals
+
+- Golden sets live in the repo or an eval store, not in chat history. Run them on prompt and model changes.
+- Track groundedness, task success, latency, cost, and safety (PII, jailbreak, harmful assistance) as first-class scores.
+- Shadow or A/B before replacing a production prompt. Keep the previous prompt version deployable.
+
+## Cost, privacy, reliability
+
+- Budget tokens per request and per session. Cache stable prefixes. Fail closed on 429s with backoff; do not infinite-retry paid APIs.
+- Redact PII before third-party APIs unless the vendor is contracted and the data class is allowed. Never log raw prompts that contain secrets or customer data.
+- Timeouts and circuit breakers on every model and tool call. Degrade to a safe fallback (cached answer, “try again”, human queue) — not a hallucinated success.

@@ -1,0 +1,55 @@
+---
+paths:
+  - "**/*.py"
+  - "**/*.ipynb"
+  - "**/pyproject.toml"
+  - "**/requirements*.txt"
+  - "**/Pipfile*"
+  - "**/environment.yml"
+  - "**/conda*.yml"
+  - "**/dvc.yaml"
+  - "**/MLproject"
+---
+
+# Python / ML systems
+
+Loads when Python, notebooks, or packaging files are in play.
+
+## Language
+
+- Python 3.11+ unless the repo pins otherwise. Type hints on public functions. `ruff` + `pytest` as the default quality bar when present.
+- Prefer packages and modules over notebooks as the source of truth. Notebooks are exploration; production code is reviewed, tested, and versioned.
+- No bare `except:`. Catch specific exceptions; log and re-raise or return a typed error. Do not swallow failures in training or serving.
+- Pin dependencies in lockfiles (`uv.lock`, `poetry.lock`, or hashed `requirements`). New deps need a reason; avoid unused scientific stacks in serving images.
+
+## Data and training
+
+- Split by entity or time when leakage is possible. Random row splits are wrong for users, sessions, or time series. Document the split in the training entrypoint or an ADR.
+- Never tune on the test set. Keep a frozen holdout. Report slice metrics (cohort, locale, class) not only global averages.
+- Version datasets (DVC, lakeFS, warehouse snapshot ID, or object-store URI + hash). A model without a data version is not reproducible.
+- Seed numpy / torch / python. Log the git SHA, data version, hyperparams, and metric in the tracker the repo already uses (MLflow, W&B, or equivalent).
+- Do not commit large `.pt` / `.onnx` / `.safetensors` / raw dumps unless the repo policy says so. Store artifacts in the registry or object store; reference by URI + digest.
+
+## Serving
+
+- FastAPI (or the repo’s existing framework) with Pydantic v2 models at the boundary. Validate input; never trust raw tensors from the client.
+- `/health` liveness and `/ready` that fails when the model or downstream is missing. Explicit request timeouts. Idempotency keys on expensive writes.
+- Batch vs online is a product choice: document latency SLO and batch window. Do not block the event loop on GPU work — run inference in a bounded executor or a dedicated worker.
+- Pin the model artifact ID in config, not in code. Rollback is “point config at the previous digest,” not a code revert of weights.
+
+## Evaluation gates
+
+- A metric move is not a ship. Require an eval set, a comparison to the current production champion, and a documented decision (ship / no-ship / shadow).
+- If the model is user-facing, add slice and safety checks (toxicity, PII leak, calibration on rare classes) before calling it done.
+- CI should run unit tests and a cheap smoke eval. Full GPU eval is nightly or on-demand, not a hidden laptop-only step.
+
+## LLM calls from Python
+
+- Prompts are code: version them, review them, eval them. Do not silently change a production prompt in the same PR as unrelated refactors.
+- Bound tokens, retries, and tool loops. Structured output must be schema-validated; discard or retry malformed model JSON.
+- Do not send secrets, raw PHI/PCI, or unbounded user dumps to a vendor without a DPA and redaction. Log model, prompt version, and token counts — not prompt contents with PII.
+
+## Security
+
+- No credentials in notebooks, comments, or `print`. `.env` is gitignored. Training data classified before it leaves the VPC.
+- Pickle/`torch.load` of untrusted files is a code-execution risk. Prefer `safetensors` / ONNX; restrict load paths.

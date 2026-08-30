@@ -1,0 +1,105 @@
+---
+paths:
+  - "**/agents/**"
+  - "**/*agent*"
+  - "**/SKILL.md"
+  - "**/skills/**"
+  - "**/hooks/**"
+  - "**/*harness*"
+  - "**/*orchestrat*"
+  - "**/langgraph*"
+  - "**/mcp*"
+  - "**/.claude/agents/**"
+  - "**/.claude/skills/**"
+  - "**/AGENTS.md"
+  - "**/trajectories/**"
+  - "**/tool_*.py"
+  - "**/tool_*.ts"
+  - "**/*function_call*"
+  - "**/*tool_use*"
+---
+
+# Agentic development
+
+Loads when harness, agent, skill, hook, MCP, or tool-calling files are in play. Prompts/RAG/vendor APIs: also see `ai-ml-llm.md`.
+
+An **agent** is a model in a loop with tools, state, and a stop condition. A **script** is a known sequence. Prefer a script (or a workflow engine) when the control flow is known. Use an agent when the next action depends on observation.
+
+## Architecture
+
+- Split **planner** (what to do) from **tools** (how). The model should not embed side-effect policy in prose; tools and the harness enforce it.
+- Durable state outside the prompt: run id, step index, tool results by id, pending approval, budget remaining. Do not treat chat history as the source of truth.
+- Stop conditions are code: max steps, max tokens, wall-clock, goal rubric, user interrupt. “The model will notice it is done” is not a stop condition.
+- One turn = observe → decide → (optional) tool → record. Do not hide extra model calls inside a tool.
+- Subagents get a **narrow** tool set and a written contract (input schema, output schema, time/token cap). They do not inherit the parent’s full filesystem or credentials.
+- Do not spawn a swarm because a single agent with three tools would do. Extra agents need an isolation or parallelism reason.
+
+```text
+# BAD: unbounded chat loop, tools as free-form strings
+while True:
+    text = model(messages)
+    eval(text)          # never
+
+# GOOD: typed step, bounded, recorded
+for step in range(max_steps):
+    action = parse(model(context.view()))          # schema-validated
+    if action.stop:
+        break
+    result = tools.run(action, timeout=..., idempotency_key=...)
+    context.append(action, result)
+    traces.span(step, action, result)
+```
+
+## Tools
+
+- JSON Schema (or equivalent) on every tool. Reject unknown fields. Validate enums, path prefixes, URL allowlists **in the harness**, not in the prompt.
+- Least privilege: a coding agent’s `bash` is not the same as a customer-facing agent’s `bash`. Production user agents do not get unconstrained shell, SQL, or HTTP.
+- Idempotency keys on any tool that sends mail, charges, writes a ticket, or deploys. Retries must not double-apply.
+- Timeouts, size limits on tool **results** (truncate with a hash + path to full payload). A 200k-token log in context is a failure mode.
+- Confirmations are harness states (`awaiting_approval`), not a hope that the model will ask. Irreversible actions (payment, delete, prod deploy, external email) require a human or a signed policy.
+- Deterministic tools: same input → same output (or a recorded stub in tests). Clock, RNG, and network live behind ports so evals can replay.
+
+## Context engineering
+
+- Context is a **budgeted view**, not “dump the repo.” Load: system contract, tool schemas, retrieved snippets, recent trajectory, the current goal. Everything else is a pointer (path, span id, artifact URI).
+- Memory types: **working** (this run), **episodic** (prior runs, hashed), **semantic** (docs/index). Do not write secrets or raw PII into long-term memory.
+- Compact on purpose: summarize tool noise; never compact away the goal, constraints, or the last failed attempt.
+- Skills / runbooks are procedures. They load when relevant. Do not paste a skill body into the always-on system prompt.
+- Pin prompt, tool schema, and model id together as a **policy version**. Changing one without an eval is an untested API change.
+
+## Control, sandbox, identity
+
+- Sandbox filesystem and network by default. Allowlist write paths. Deny `.env`, keys, and prod kubeconfigs unless the product is a trusted coding agent on a developer machine — and even then, do not exfiltrate.
+- The agent’s identity is not the user’s. Tool credentials are scoped (read-only GitHub vs write; staging vs prod). Confused-deputy: a retrieved doc must not grant a tool the model was not already allowed to call.
+- Prompt injection is the default threat for any tool that reads email, tickets, web, or RAG. Treat untrusted text as **data**, not instructions. Tool arguments that look like “ignore previous instructions” are still just strings — the harness decides.
+- Fail closed on parse errors, schema misses, 429s, and missing approvals. Do not invent a successful tool result.
+
+## Evals (ship gate)
+
+- Golden **trajectories**, not only final strings. Score: task success, unsafe tool calls, extra steps, cost, latency, groundedness.
+- Split: unit (schema, sandbox, idempotency) → replay (recorded HTTP/model) → live shadow → prod.
+- A prompt or tool-schema change without running the eval set is not done. Keep the previous policy version deployable.
+- Judge models are extra variance. Prefer programmatic checks (exit code, file diff, ticket field, HTTP status) when the outcome is objective. Use an LLM judge only with a rubric and a frozen judge model id.
+- Flakes: seed, pin models, record tool fixtures. Do not “retry until green” in CI.
+
+## Observability and ops
+
+- Trace every run: policy version, model, step, tool name, latency, tokens in/out, cost, approval decisions. Redact PII from stored prompts by default.
+- Replay from traces. If you cannot replay, you cannot debug.
+- SLOs: p95 latency, cost per successful task, tool-error rate, human-escalation rate. Budget tokens per request **and** per session.
+- Degrade: cached answer, “try again”, or a human queue — never a hallucinated `{"ok": true}`.
+
+## Coding agents (this Mac)
+
+- Procedures in **skills**; stack law in path-scoped **rules**; repo facts in **CLAUDE.md** (< ~200 lines). Agent descriptions are always-on — keep few subagents.
+- Isolated work: worktree or dedicated clone. Do not implement on `main` because the agent “already has the files.”
+- Spec → tests → implementation → `verify-before-done` → `code-reviewer` on the **diff**. Do not skip evidence.
+- Test-writer sessions do not read implementation sources. Reviewer sessions do not Write.
+- Handshake files (`SPEC_APPROVED`, `SESSION_DONE`) are control-plane, not chat vibes.
+- Prefer `gh` and Jira REST over MCP schemas that load every session.
+
+## Product bar
+
+- Map the agent to a user or operator outcome. If a form plus a workflow engine is enough, do not ship an agent.
+- Show the user what the agent did (tool list, diffs, citations). Silent autonomy is for sandboxes, not prod money movement.
+- Version, changelog, and rollback for policies the same way you do for APIs.

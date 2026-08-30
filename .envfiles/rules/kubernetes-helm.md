@@ -1,0 +1,45 @@
+---
+paths:
+  - "**/Dockerfile*"
+  - "**/docker-compose*.{yml,yaml}"
+  - "**/charts/**"
+  - "**/helm/**"
+  - "**/*.tf"
+  - "**/*.tfvars"
+  - "**/kustomization.yaml"
+  - "**/*.k8s.yaml"
+  - "**/values.yaml"
+  - "**/values-*.yaml"
+  - "**/.github/workflows/**"
+  - "**/.gitlab-ci.yml"
+  - "**/skaffold.yaml"
+---
+
+# Containers, Kubernetes, Helm, CI
+
+Loads when Docker, Helm, Terraform, or CI workflow files are in play.
+
+## Images
+
+- Pin base image digests or major.minor tags. No `:latest` in production manifests.
+- Distroless or minimal runtime. Non-root user. Multi-stage builds. Do not copy `.env` or private keys into layers.
+- SBOM + scan (Trivy or the repo’s scanner) in CI for app images.
+
+## Kubernetes / Helm
+
+- Resource requests and limits on every container. Liveness vs readiness vs startup probes — do not use the same probe for all three.
+- Config via ConfigMap/values; secrets via the cluster secret store or Sealed Secrets / External Secrets, never plaintext in git.
+- One chart per service unless the repo already umbrellas. Values files per environment; `values-prod.yaml` must not contain credentials.
+- PDB, HPA, and topology spread when the service is user-facing. Graceful shutdown: preStop + app timeout aligned with the probe.
+- NetworkPolicy when the cluster supports it. No public LoadBalancer for admin UIs.
+
+## Terraform / infra
+
+- State in a remote backend with lock. No local prod state. `terraform plan` in CI; apply is gated.
+- Modules over copy-paste. Destroy-protection on stateful stores.
+
+## CI
+
+- Compile, unit, lint, then integration. Do not deploy from a laptop as the documented prod path.
+- Separate build and deploy jobs. Staging before prod. Manual approval for prod unless the team has already automated it with signed policies.
+- Cache dependencies; do not cache secrets.

@@ -1,0 +1,43 @@
+---
+paths:
+  - "**/ADR*"
+  - "**/adr/**"
+  - "**/docs/**"
+  - "**/CONTEXT.md"
+  - "**/PRODUCT.md"
+  - "**/PRD*"
+  - "**/rfc*"
+  - "**/RFC*"
+  - "**/CHANGELOG*"
+  - "**/openapi*.{yaml,yml,json}"
+  - "**/proto/**"
+---
+
+# Product engineering (docs, ADRs, contracts)
+
+Loads when product docs, ADRs, or public API contracts are in play.
+
+## Outcomes
+
+- Map the change to a user or operator outcome. If that mapping is missing, stop and ask — do not invent scope.
+- Do not silently expand the story. New surface area goes in a follow-up ticket or an explicit user decision.
+
+## ADRs
+
+- Write an ADR when the choice is hard to reverse: datastore, authn, eventing, consistency, public API shape, model vendor, or Temporal topology.
+- One decision per ADR. State context, options, the pick, and consequences. Do not use ADRs for implementation diaries.
+
+## Domain language
+
+- Prefer the repo’s `CONTEXT.md` / glossary over new synonyms. If you must introduce a term, add it to the glossary in the same change.
+- Public API names are product language. Do not leak internal table names or vendor types into OpenAPI.
+
+## Contracts
+
+- OpenAPI / proto is the contract. Code implements it. Do not change a field’s meaning in place; add, deprecate, then remove.
+- Breaking changes need a version policy the repo already uses (URL version, header, or additive-only). Document rollback.
+
+## Quality bar before “done”
+
+- Evidence: tests run, eval or screenshot if UI, risks, rollback. Skills: `verify-before-done`, then spawn `code-reviewer` on the diff.
+- Security, privacy, and observability are part of the story when behavior changes in production — not a later ticket by default.

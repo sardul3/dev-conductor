@@ -6,7 +6,7 @@ dev-conductor is the Jira-to-PR loop. Do not silently revert these:
 - Handshake files in the run dir: `SPEC_APPROVED`, `SESSION_DONE`. `SPEC_APPROVED` means the spec is accepted, not that the ticket is done.
 - Isolation: `git.isolation: treehouse` + `queue.max_active: 3`. Eval (`config.test.yaml`) uses `isolation: none`.
 - Secrets stay in `~/.config/dev-conductor/secrets.env`. Never commit them.
-- Procedures live in `skills/`. Stack law lives in path-scoped rules. Do not paste those bodies here.
+- Procedures live in `skills/`. Stack law lives in `.envfiles/rules/` (path-scoped). Do not paste those bodies here.
 
 ## Commands
 
@@ -21,7 +21,7 @@ dev-conductor is the Jira-to-PR loop. Do not silently revert these:
 - `plugins/dev-loop/` — plugin wrapper (symlinks to `skills/` and `claude/`)
 - `skills/` — loop + prompt-enrich skills
 - `claude/agents/` — `code-reviewer`, `debugger`, `code-simplifier`
-- `.envfiles/` — canonical `AGENTS.md` / `CLAUDE.md` (this file). Root pointers load it.
+- `.envfiles/` — canonical `AGENTS.md` / `CLAUDE.md` (this file) and path-scoped `rules/`. Root pointers load this file.
 
 ## Working agreements
 

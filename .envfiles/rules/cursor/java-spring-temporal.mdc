@@ -1,0 +1,72 @@
+---
+description: Java 21 / Spring Boot 3 / Temporal. Off unless Java or Gradle files are in play.
+globs: **/*.{java,kt,kts}
+alwaysApply: false
+---
+
+# Java 21 / Spring Boot 3 / Temporal
+
+Loads only when Java, Kotlin, or Gradle files are in play. Do not copy this into root `CLAUDE.md` or Cursor User Rules.
+
+## Language and style
+
+- Java 21: records for immutable DTOs and config; sealed types for closed hierarchies; pattern matching for `instanceof` and `switch`; text blocks for SQL/JSON fixtures.
+- Virtual threads for blocking IO only, not CPU-bound work.
+- Google Java Format, 120 columns. Jakarta `@Nonnull` / `@Nullable` on public APIs.
+- Public types and public methods need Javadoc that states intent, contracts, side effects, and constraints — not a restatement of the signature.
+- Prefer clarity over cleverness. No experimental language features that hurt maintainability.
+
+## Architecture
+
+- Prefer DDD + hexagonal / ports-and-adapters where the repo already uses it. Package-by-feature over package-by-layer when starting new modules.
+- Domain has no Spring, JPA, HTTP, or Temporal SDK annotations. Application services orchestrate use cases and own transaction boundaries.
+- Controllers are thin: validate, map, return `ResponseEntity`. Business logic does not live in adapters.
+- Immutable DTOs (records). Explicit mappers (MapStruct or hand-written). No entity leak across the HTTP boundary.
+
+## Configuration
+
+- No magic constants. Tunables live in `application.yml` bound to `@ConfigurationProperties` records with `@Validated`.
+- Fail fast on missing/invalid config. Profile overlays: `local`, `dev`, `test`, `stage`, `prod`.
+- Secrets via env or a secret store. Never commit `.env`, keys, or prod URLs with credentials.
+- Temporal timeouts, retries, task queues, heartbeats, and concurrency come from config. Never hardcode `ActivityOptions` / `WorkflowOptions` literals.
+
+## HTTP APIs
+
+- RFC HTTP semantics. Safe methods are idempotent. Correct status codes (201 + `Location` on create; 304/412 for ETag; 409 conflicts; 422 validation).
+- Errors as `application/problem+json` via `@ControllerAdvice` + `ProblemDetail`. Stable `errorCode`. No stack traces or internal IDs in bodies.
+- Typed exceptions (`NotFound`, `Conflict`, `Validation`, `ExternalService`) extending one app base. Never throw raw `RuntimeException`.
+- Outbound: `X-Request-Id`, W3C `traceparent`. Writes accept `X-Idempotency-Key` when the operation is not naturally idempotent.
+- Pagination: explicit limits; validate `page`/`size`. ETag / `Cache-Control` on cacheable GETs.
+
+## Persistence
+
+- PostgreSQL preferred. Schema via Flyway or Liquibase in repo. Optimistic locking (`version`) when concurrent updates exist.
+- Testcontainers for integration tests (real DB, real Redis). No DB peeking when a repository/API assertion will do.
+- Idempotent upserts for externally keyed data. Outbox for reliable events.
+
+## Temporal
+
+- Workflows are deterministic: no HTTP, DB, IO, random, or `Thread.sleep`. Side effects only in Activities.
+- Activities are idempotent and retry-safe. Heartbeat long work; handle cancel cooperatively.
+- `Workflow.getVersion` for any change to await/timer/activity order. Never remove or reorder without versioning.
+- Separate API and worker processes. Task queues and worker limits from config.
+
+## Testing
+
+- TDD for behavior changes: failing test at a public seam, then implementation.
+- JUnit 5 + AssertJ. Name `given_when_then`. Slice tests (`@WebMvcTest`, `@DataJpaTest`) plus Testcontainers integration.
+- Temporal: `TestWorkflowEnvironment`; do not inject Spring beans into workflow implementations.
+- Do not delete or weaken tests to go green. Mutation testing for critical branching when the repo already runs PIT.
+
+## Security and ops
+
+- OWASP ASVS baseline: validate inputs, encode outputs, least-privilege authz (Spring Security 6, OAuth2/OIDC/JWT as the repo already does).
+- Never log secrets, tokens, PHI, PCI, SSNs. JSON logs with `correlationId` / `traceId` in MDC.
+- Actuator: health, readiness, liveness, prometheus. Micrometer tags: route, method, status, requestType.
+- OpenTelemetry with W3C propagation. Distroless/Alpine images; Helm values commented; no `:latest` tags.
+
+## Delivery
+
+- Conventional commits with the story key. Small reviewable diffs. Do not mix refactor with behavior change unless required for safety.
+- New dependencies need a reason and a license check. API/DB/auth/Helm/Temporal changes need an ADR when they are hard to reverse.
+- Do not push or deploy without explicit user approval.
