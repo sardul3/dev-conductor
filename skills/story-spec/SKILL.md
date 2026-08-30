@@ -13,3 +13,5 @@ description: Turn a Jira story into a technical spec via grill. Use in the spec 
 6. Ask the user to approve **the spec**. On yes, write `SPEC_APPROVED` and `APPROVED`, then `SESSION_DONE` and `STAGE_DONE` in that run dir. `APPROVED` means spec accepted, not that the ticket is done.
 
 Do not write application code. Do not open a PR.
+
+If the Jira issue is UI/UX (screens, layout, visual QA), you may load skill `lavish-ui` (spike). Keep AC in this `spec.md`. Do not replace the ticket with HTML.

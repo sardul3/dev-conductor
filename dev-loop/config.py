@@ -64,6 +64,16 @@ class GitCfg:
     stack_prs: bool = False
     max_files_per_pr: int = 0
     merge_method: str = "squash"
+    # none = work in the clone. treehouse = `treehouse get --lease` (isolated worktree).
+    isolation: str = "none"
+    treehouse_bin: str = "treehouse"
+    treehouse_return_on_ship: bool = True
+    treehouse_lease_holder: str = "dev-loop"
+
+
+@dataclass
+class QueueCfg:
+    max_active: int = 3
 
 
 @dataclass
@@ -247,6 +257,7 @@ class DevLoopConfig:
     verify_timeout_sec: int = 1800
     jira: JiraCfg = field(default_factory=JiraCfg)
     git: GitCfg = field(default_factory=GitCfg)
+    queue: QueueCfg = field(default_factory=QueueCfg)
     runtime: RuntimeCfg = field(default_factory=RuntimeCfg)
     caps: CapsCfg = field(default_factory=CapsCfg)
     review: ReviewCfg = field(default_factory=ReviewCfg)
@@ -345,6 +356,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
     secrets = load_secrets()
     jira_d = data.get("jira") if isinstance(data.get("jira"), dict) else {}
     git_d = data.get("git") if isinstance(data.get("git"), dict) else {}
+    q_d = data.get("queue") if isinstance(data.get("queue"), dict) else {}
     rt_d = data.get("runtime") if isinstance(data.get("runtime"), dict) else {}
     caps_d = data.get("caps") if isinstance(data.get("caps"), dict) else {}
     rev_d = data.get("review") if isinstance(data.get("review"), dict) else {}
@@ -428,6 +440,13 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             stack_prs=bool(git_d.get("stack_prs", False)),
             max_files_per_pr=int(git_d.get("max_files_per_pr") or 0),
             merge_method=str(git_d.get("merge_method") or "squash"),
+            isolation=str(git_d.get("isolation") or "treehouse"),
+            treehouse_bin=str(git_d.get("treehouse_bin") or "treehouse"),
+            treehouse_return_on_ship=bool(git_d.get("treehouse_return_on_ship", True)),
+            treehouse_lease_holder=str(git_d.get("treehouse_lease_holder") or "dev-loop"),
+        ),
+        queue=QueueCfg(
+            max_active=int(q_d.get("max_active") or 3),
         ),
         runtime=RuntimeCfg(
             agent=str(rt_d.get("agent") or "claude"),

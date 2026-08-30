@@ -29,3 +29,5 @@ python3 ~/.claude/hooks/dev-loop/cli.py continue KEY
 ```
 
 Poller: `cli.py poll` / `install-poller`. Never commit `main`/`master`.
+
+Isolation: example config uses `git.isolation: treehouse` (leased worktree) and `queue.max_active: 3`. Start from the clone under `~/dev`; do not `cd` into `~/.treehouse` yourself. A fourth in-progress ticket exits until one ships or you `treehouse return PATH`.

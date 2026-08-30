@@ -3,6 +3,8 @@
 .env
 .env.*
 !.env.example
+!.envfiles/
+!.envfiles/**
 secrets.env
 *.pem
 *.key

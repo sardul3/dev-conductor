@@ -29,6 +29,8 @@ python3 ~/.claude/hooks/dev-loop/cli.py start PROJ-123 --repo /path/to/repo
 Config: `~/.config/dev-conductor/dev-loop/config.yaml`  
 Secrets: `~/.config/dev-conductor/secrets.env` (`ATLASSIAN_*`). Never commit.
 
+Isolation: `git.isolation: treehouse` leases a worktree (`treehouse get --lease`). Eval uses `none`. Concurrent tickets: `queue.max_active: 3`.
+
 Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml eval --repo /path/to/lab-repo`
 
 ## Layout
@@ -43,6 +45,7 @@ Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml ev
 | `claude/prompt-enrich/` | Spec grill + launch |
 | `cursor/dev-loop/` | Cursor `install.sh` + `dev-loop.mdc` |
 | `install.sh` | One-shot install |
+| `.envfiles/` | Canonical `AGENTS.md` (root `CLAUDE.md` / `AGENTS.md` are pointers) |
 
 ## Tests
 

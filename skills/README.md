@@ -17,6 +17,7 @@ Source of truth is this directory. Plugin and Cursor install from here (`plugins
 | `dev-loop-review` | `verdict.json` via `code-reviewer` |
 | `pr-comment-fixer` | Address PR review comments |
 | `jira-progress` | Jira REST column moves + comments |
+| `lavish-ui` | Spike: Lavish HTML review for UI/UX tickets only |
 
 ## Coding / ops (used by the loop)
 

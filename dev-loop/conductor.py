@@ -22,6 +22,7 @@ from touched import changed_since, load_snapshot, save_snapshot, snapshot_tree
 from verify_infer import run_verify
 from watch import add_watch
 from progress import backfill, record
+from treehouse import prepare_workspace, release_lease, workspace_for_run
 
 ISSUE_KEY = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
 
@@ -33,7 +34,7 @@ def require_key(key: str) -> str:
     return k
 
 
-def require_repo(path: Path, cfg: DevLoopConfig) -> Path:
+def require_repo(path: Path, cfg: DevLoopConfig, *, check_location: bool = True) -> Path:
     repo = path.resolve()
     if not is_git_repo(repo):
         raise SystemExit(f"dev-loop: {repo} is not a git repo")
@@ -44,7 +45,7 @@ def require_repo(path: Path, cfg: DevLoopConfig) -> Path:
         raise SystemExit(f"dev-loop: {slug} is denylisted")
     if cfg.git.require_github_remote and github_remote(repo) is None:
         raise SystemExit(f"dev-loop: {repo} has no GitHub remote (git.require_github_remote)")
-    if not under_dev(repo, cfg.dev_root) and not cfg.git.allow_outside_dev and os.environ.get("DEVLOOP_ALLOW_OUTSIDE") != "1":
+    if check_location and not under_dev(repo, cfg.dev_root) and not cfg.git.allow_outside_dev and os.environ.get("DEVLOOP_ALLOW_OUTSIDE") != "1":
         raise SystemExit(f"dev-loop: {repo} is not under {cfg.dev_root}")
     return repo
 
@@ -153,12 +154,20 @@ def _maybe_adapter(stage: str, key: str, repo: Path, run: Path, cfg: DevLoopConf
 
 def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
     cfg = cfg or load_config()
-    repo = require_repo(repo, cfg)
+    origin = require_repo(repo, cfg)
     key = require_key(key)
     run = fetch_issue(key, cfg)
+    repo = prepare_workspace(origin, cfg, run)
     load_or_build(repo)
     issue = json.loads((run / "issue.json").read_text(encoding="utf-8"))
-    update_state(ticket=key, repo=str(repo), stage="spec", slug=repo_slug(repo), pr_number=None)
+    update_state(
+        ticket=key,
+        repo=str(repo),
+        origin_repo=str(origin),
+        stage="spec",
+        slug=repo_slug(origin),
+        pr_number=None,
+    )
     record(run, "fetch", "ok", ticket=key, note=str(repo))
     record(run, "spec", "started", ticket=key)
     progress(cfg, key, "on_start", f"dev-loop started in {repo.name}")
@@ -190,9 +199,11 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
     cfg = cfg or load_config()
     key = require_key(key)
     st = load_state()
-    repo = Path(repo or st.get("repo") or os.getcwd())
-    repo = require_repo(repo, cfg)
+    origin = Path(repo or st.get("origin_repo") or st.get("repo") or os.getcwd())
     run = run_dir(key)
+    leased = (run / "lease.json").is_file()
+    repo = workspace_for_run(run, origin)
+    repo = require_repo(repo, cfg, check_location=not leased)
     backfill(run)
     if not spec_is_approved(run):
         raise SystemExit(f"dev-loop: spec not approved — see {run / 'progress.md'}")
@@ -349,6 +360,7 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
     if not cfg.git.push:
         update_state(stage="shipped-local", pr_number=None, branch=branch, pr_numbers=[])
         record(run, "ship", "local", ticket=key, note=branch)
+        release_lease(run, cfg)
         print(f"dev-loop: local commit on {branch} (git.push false)")
         return 0
     for prn in prs:
@@ -362,4 +374,5 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
     else:
         record(run, "ship", "pushed", ticket=key, note=branch)
         print(f"dev-loop: pushed {branch} (no PR number parsed)")
+    release_lease(run, cfg)
     return 0

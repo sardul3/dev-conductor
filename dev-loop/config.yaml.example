@@ -47,6 +47,16 @@ git:
   stack_prs: false
   max_files_per_pr: 0
   merge_method: squash
+  # treehouse = isolated git worktree via `treehouse get --lease` (not a subshell).
+  # none = work in the clone you passed to start. Eval uses none.
+  isolation: treehouse
+  treehouse_bin: treehouse
+  treehouse_return_on_ship: true
+  treehouse_lease_holder: dev-loop
+
+# Concurrent in-progress tickets (run dirs that are not yet shipped). Extra starts exit.
+queue:
+  max_active: 3
 
 runtime:
   # claude = launch-clean-claude.sh; cursor = write prompts only (run in Cursor);

@@ -38,6 +38,10 @@ git:
   rewrite_unpushed: true
   stack_prs: false
   max_files_per_pr: 0
+  isolation: none
+
+queue:
+  max_active: 3
 
 runtime:
   agent: none

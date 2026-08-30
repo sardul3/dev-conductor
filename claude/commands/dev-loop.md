@@ -23,3 +23,5 @@ python3 ~/.claude/hooks/dev-loop/cli.py continue KEY --repo PATH
 ```
 
 Requires GitHub remote, `gh` auth, and Atlassian secrets in `~/.config/dev-conductor/secrets.env`. No Jira/GitHub MCP.
+
+Example config leases a treehouse worktree (`git.isolation: treehouse`) and caps concurrent tickets at `queue.max_active: 3`. Eval config sets isolation `none`.
