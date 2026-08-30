@@ -1,0 +1,26 @@
+{
+  "description": "SessionStart prints Jira keys; PreToolUse isolates test-writer. Requires ./dev-loop/install.sh so CLI lives in ~/.claude/hooks/dev-loop.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${HOME}/.claude/hooks/dev-loop/session_start.py"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${HOME}/.claude/hooks/dev-loop/deny_impl.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,168 @@
+# ~/.config/dev-conductor/dev-loop/config.yaml
+# All knobs live here. Secrets stay in ~/.config/dev-conductor/secrets.env.
+
+mode: prod
+dev_root: ~/dev
+
+repo:
+  # If non-empty, only these folder names may run /dev-loop (SessionStart still prints keys at ~/dev).
+  allowlist: []
+  denylist: []
+  # Picker when cwd is not a git repo: scan ~/dev this many levels deep.
+  max_depth: 3
+  max_choices: 40
+  ask_when_cwd_not_repo: true
+  create_private: true
+  gh_create: true
+
+jira:
+  project: ASE
+  jql: 'assignee = currentUser() AND sprint in openSprints() AND statusCategory != Done'
+  # Override secrets ATLASSIAN_BASE_URL when set.
+  base_url: ''
+  auth: basic
+  search_path: /rest/api/3/search/jql
+  issue_path: /rest/api/3/issue/{key}
+  fields: summary,description,status,issuetype,comment,labels
+  max_keys: 15
+  timeout_sec: 20
+  comment_limit: 8
+
+git:
+  require_github_remote: true
+  allow_outside_dev: false
+  never_commit_branches:
+    - main
+    - master
+  branch_pattern: 'feat/{key}-{slug}'
+  commit_type: feat
+  slug_max_len: 40
+  push: true
+  create_pr: true
+  gh_bin: gh
+  pr_title_pattern: '{type}: {summary} ({key})'
+  merge_to_default_after_ship: false
+  check_conventional: true
+  rewrite_unpushed: true
+  stack_prs: false
+  max_files_per_pr: 0
+  merge_method: squash
+
+runtime:
+  # claude = launch-clean-claude.sh; cursor = write prompts only (run in Cursor);
+  # none = no terminals (eval / builtin adapters).
+  agent: claude
+  launch_script: ~/.claude/hooks/prompt-enrich/launch-clean-claude.sh
+  wait_timeout_sec: 86400
+  poll_interval_sec: 2
+  no_launch: false
+  builtin_adapters: false
+  auto_continue: false
+
+caps:
+  writer_retries: 3
+  review_retries: 3
+
+review:
+  pass_verdicts:
+    - excellent
+    - good
+  rewrite_verdicts:
+    - good-with-risks
+    - needs_improvement
+    - blocker
+  default_verdict: good
+
+stages:
+  spec:
+    enabled: true
+    auto_approve: false
+  test_writer:
+    enabled: true
+  writer:
+    enabled: true
+  verify:
+    enabled: true
+  review:
+    enabled: true
+  simplify:
+    enabled: false
+  ship:
+    enabled: true
+
+session_start:
+  enabled: true
+  cache_minutes: 10
+  keys_limit: 15
+  print_keys: true
+
+memory:
+  max_contract_files: 24
+  max_contract_lines: 80
+
+health: {}
+verify: {}
+verify_fail_closed: true
+verify_timeout_sec: 1800
+
+
+# --- v2 gates (off until you opt in) ---
+# PIT "survived" is mutants that were NOT killed (bad). Prefer metric: killed, min_pct: 75.
+# Do not set min_pct: 98 with metric: survived unless you really want almost no killing.
+
+quality:
+  snyk:
+    enabled: false
+    required: false
+    cmd: snyk test --json
+    fail_on: high
+  sonar:
+    enabled: false
+    required: false
+    cmd: sonar-scanner
+  mutation:
+    enabled: false
+    required: false
+    cmd: ''
+    metric: killed
+    min_pct: 75
+
+evidence:
+  enabled: false
+  mode: http
+  timeout_sec: 8
+  playwright_cmd: ''
+  probes: []
+  # probes:
+  #   - method: GET
+  #     url: http://127.0.0.1:8080/actuator/health
+
+poller:
+  enabled: false
+  interval_minutes: 30
+  auto_merge: false
+  on_comments: fix
+  on_checks_failed: fix
+  notify: true
+  merge_method: squash
+  bot_logins: []
+
+workflow:
+  enabled: false
+  on_start: In Progress
+  on_pr: In Review
+  on_merge: Done
+  on_block: Blocked
+  on_waiting: Waiting
+  deploy_ticket_jql: ''
+  deploy_ticket_key: ''
+  comment_on_progress: true
+
+# supervised = grill spec then wait. unattended = auto-approve spec and run through PR with no operator.
+# Still launches agent sessions; they must finish on their own. merge: auto turns on poller.auto_merge.
+autonomy:
+  profile: supervised
+  spec_approval: human
+  continue_after_spec: false
+  merge: alert
+  ask_repo: true

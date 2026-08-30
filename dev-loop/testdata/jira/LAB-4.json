@@ -1,0 +1,68 @@
+{
+  "key": "LAB-4",
+  "fields": {
+    "summary": "Get task by id",
+    "description": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a user I fetch one task via GET /tasks/{id}."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance:"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- known id -> 200 with that task"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- unknown id -> 404"
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "To Do"
+    },
+    "issuetype": {
+      "name": "Story"
+    },
+    "labels": [
+      "devloop-lab"
+    ],
+    "comment": {
+      "comments": []
+    }
+  }
+}

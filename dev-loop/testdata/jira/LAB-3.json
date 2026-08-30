@@ -1,0 +1,68 @@
+{
+  "key": "LAB-3",
+  "fields": {
+    "summary": "List tasks",
+    "description": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a user I list all tasks via GET /tasks."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance:"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- GET /tasks -> 200 JSON array"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- includes tasks created via POST"
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "To Do"
+    },
+    "issuetype": {
+      "name": "Story"
+    },
+    "labels": [
+      "devloop-lab"
+    ],
+    "comment": {
+      "comments": []
+    }
+  }
+}

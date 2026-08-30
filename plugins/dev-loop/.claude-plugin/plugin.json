@@ -1,0 +1,12 @@
+{
+  "name": "dev-loop",
+  "version": "1.1.0",
+  "description": "Jira REST to PR conductor (no Jira/GitHub MCP). Config-driven.",
+  "author": {
+    "name": "dev-conductor"
+  },
+  "agents": "./agents",
+  "skills": "./skills",
+  "commands": "./commands",
+  "hooks": "./hooks/hooks.json"
+}

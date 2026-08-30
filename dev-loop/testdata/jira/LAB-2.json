@@ -1,0 +1,77 @@
+{
+  "key": "LAB-2",
+  "fields": {
+    "summary": "Create a task",
+    "description": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a user I create a task with a title via POST /tasks."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance:"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- POST /tasks JSON {title: string} -> 201"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- response includes id and title and status todo"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- missing title -> 400"
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "To Do"
+    },
+    "issuetype": {
+      "name": "Story"
+    },
+    "labels": [
+      "devloop-lab"
+    ],
+    "comment": {
+      "comments": []
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "key": "LAB-5",
+  "fields": {
+    "summary": "Complete a task",
+    "description": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a user I mark a task done via POST /tasks/{id}/complete."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance:"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- known id -> 200 status done"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "- unknown id -> 404"
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "To Do"
+    },
+    "issuetype": {
+      "name": "Story"
+    },
+    "labels": [
+      "devloop-lab"
+    ],
+    "comment": {
+      "comments": []
+    }
+  }
+}

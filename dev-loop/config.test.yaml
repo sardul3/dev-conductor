@@ -1,0 +1,125 @@
+# Test/eval profile. All prod side-effects off. Point jira.base_url at fake_jira.
+# Usage: DEVLOOP_CONFIG=.../config.test.yaml DEVLOOP_HOME=/tmp/devloop-eval python3 cli.py eval
+
+mode: test
+dev_root: ~/dev
+
+repo:
+  allowlist:
+    - devloop-lab
+  denylist: []
+  max_depth: 2
+  max_choices: 20
+  ask_when_cwd_not_repo: false
+  gh_create: false
+
+jira:
+  project: LAB
+  jql: 'statusCategory != Done'
+  base_url: http://127.0.0.1:8765
+  auth: none
+  search_path: /rest/api/3/search/jql
+  issue_path: /rest/api/3/issue/{key}
+  max_keys: 15
+  timeout_sec: 5
+
+git:
+  require_github_remote: false
+  allow_outside_dev: false
+  never_commit_branches:
+    - main
+    - master
+  branch_pattern: 'feat/{key}-{slug}'
+  commit_type: feat
+  push: false
+  create_pr: false
+  merge_to_default_after_ship: true
+  check_conventional: true
+  rewrite_unpushed: true
+  stack_prs: false
+  max_files_per_pr: 0
+
+runtime:
+  agent: none
+  no_launch: true
+  builtin_adapters: true
+  auto_continue: true
+  wait_timeout_sec: 5
+  poll_interval_sec: 0
+
+caps:
+  writer_retries: 2
+  review_retries: 1
+
+review:
+  pass_verdicts:
+    - excellent
+    - good
+  rewrite_verdicts:
+    - needs_improvement
+    - blocker
+  default_verdict: good
+
+stages:
+  spec:
+    enabled: true
+    auto_approve: true
+  test_writer:
+    enabled: true
+  writer:
+    enabled: true
+  verify:
+    enabled: true
+  review:
+    enabled: true
+  ship:
+    enabled: true
+
+session_start:
+  enabled: true
+  cache_minutes: 1
+  print_keys: true
+
+verify:
+  devloop-lab:
+    test: python3 -m unittest discover -s tests -q
+health: {}
+verify_fail_closed: true
+verify_timeout_sec: 60
+
+quality:
+  snyk:
+    enabled: false
+    required: false
+  sonar:
+    enabled: false
+    required: false
+  mutation:
+    enabled: false
+    required: false
+    metric: killed
+    min_pct: 75
+
+evidence:
+  enabled: false
+  mode: http
+  probes: []
+
+poller:
+  enabled: false
+  interval_minutes: 30
+  auto_merge: false
+  on_comments: fix
+  on_checks_failed: fix
+  notify: false
+
+workflow:
+  enabled: false
+  comment_on_progress: false
+
+autonomy:
+  profile: unattended
+  spec_approval: auto
+  continue_after_spec: true
+  merge: off
+  ask_repo: false

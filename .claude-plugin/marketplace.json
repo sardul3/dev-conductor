@@ -1,0 +1,12 @@
+{
+  "name": "dev-conductor",
+  "owner": {
+    "name": "sardul3"
+  },
+  "plugins": [
+    {
+      "name": "dev-loop",
+      "source": "./plugins/dev-loop"
+    }
+  ]
+}
