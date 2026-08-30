@@ -150,6 +150,50 @@ def cmd_memory(ns: argparse.Namespace) -> int:
     )
 
 
+
+
+def cmd_agent_memory(ns: argparse.Namespace) -> int:
+    """Apply durable metadata from a verdict.json into the target repo."""
+    from agent_memory import ApplyError, apply_verdict_file
+    from paths import run_dir
+
+    repo = Path(ns.repo).expanduser().resolve() if ns.repo else Path.cwd()
+    if ns.verdict:
+        verdict_path = Path(ns.verdict).expanduser().resolve()
+    elif ns.key:
+        verdict_path = run_dir(str(ns.key)) / "verdict.json"
+    else:
+        return fail("pass --verdict PATH or --key TICKET", code=2)
+    if not verdict_path.is_file():
+        return fail(f"no verdict at {verdict_path}", code=2)
+    try:
+        results = apply_verdict_file(repo, verdict_path)
+    except ApplyError as exc:
+        return fail(str(exc), code=2)
+    except json.JSONDecodeError as exc:
+        return fail(f"verdict unreadable: {exc}", code=2)
+    applied = sum(1 for r in results if r.get("status") == "applied")
+    rejected = sum(1 for r in results if r.get("status") == "rejected")
+    return _show(
+        emit(
+            Document(
+                bin="cli.py",
+                description="agent-memory apply",
+                meta={
+                    "repo": str(repo),
+                    "verdict": str(verdict_path),
+                    "applied": applied,
+                    "rejected": rejected,
+                    "results": results,
+                },
+                help=["Write durable metadata[] on verdict.json; harness applies AGENTS.md / path-scoped rules."],
+            ),
+            fmt=_fmt(ns),
+            full=_full(ns),
+        )
+    )
+
+
 def cmd_verify(ns: argparse.Namespace) -> int:
     cfg = _cfg(ns)
     repo = Path(ns.repo).expanduser().resolve() if ns.repo else Path.cwd()
@@ -262,9 +306,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_fetch)
 
     s = sub.add_parser("memory")
+
     s.add_argument("--repo")
     s.add_argument("--force", action="store_true")
     s.set_defaults(func=cmd_memory)
+
+    s = sub.add_parser("agent-memory", help="Apply verdict.metadata[] into AGENTS.md / path-scoped rules")
+    s.add_argument("--repo", help="Target git repo (default: cwd)")
+    s.add_argument("--verdict", help="Path to verdict.json")
+    s.add_argument("--key", help="Ticket key; reads runs/KEY/verdict.json")
+    s.set_defaults(func=cmd_agent_memory)
 
     s = sub.add_parser("verify")
     s.add_argument("--repo")

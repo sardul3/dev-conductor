@@ -158,6 +158,12 @@ class MemoryCfg:
 
 
 @dataclass
+class AgentMemoryCfg:
+    # Apply verdict.metadata[] into AGENTS.md / path-scoped rules after review.
+    auto_apply: bool = True
+
+
+@dataclass
 class SnykCfg:
     enabled: bool = False
     required: bool = False
@@ -279,6 +285,7 @@ class DevLoopConfig:
     review: ReviewCfg = field(default_factory=ReviewCfg)
     session_start: SessionStartCfg = field(default_factory=SessionStartCfg)
     memory: MemoryCfg = field(default_factory=MemoryCfg)
+    agent_memory: AgentMemoryCfg = field(default_factory=AgentMemoryCfg)
     spec_auto_approve: bool = False
     repo_pick: RepoPickCfg = field(default_factory=RepoPickCfg)
     quality: QualityCfg = field(default_factory=QualityCfg)
@@ -502,6 +509,9 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             max_contract_lines=int(mem_d.get("max_contract_lines") or 80),
             contract_globs=_str_list(mem_d.get("contract_globs"))
             or MemoryCfg().contract_globs,
+        ),
+        agent_memory=AgentMemoryCfg(
+            auto_apply=bool((data.get("agent_memory") or {}).get("auto_apply", True)),
         ),
         spec_auto_approve=spec_auto,
         repo_pick=RepoPickCfg(

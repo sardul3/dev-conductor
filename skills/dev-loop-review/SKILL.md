@@ -20,3 +20,5 @@ excellent/good → ship. Anything else → writer (caps in config). After cap, s
 4. Write `SESSION_DONE` and `STAGE_DONE`. If the verdict shows a **durable** convention miss (not a one-off bug), load `agent-memory` and update one relevant file; do not invent ADRs or always-on rules.
 
 Do not commit. Do not open a PR. Do not spawn extra marketplace agents.
+
+For durable convention misses, put items in `verdict.json` `metadata[]` (target/text[/path/globs/reason]). Conductor auto-applies when `agent_memory.auto_apply` is true; do not invent ADRs or always-on rules.

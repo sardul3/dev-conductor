@@ -1,16 +1,46 @@
 ---
 name: agent-memory
-description: Persist durable agent metadata after self-review, user review, PR comments, or a correction. Use when verdict.json, review feedback, or a user correction implies a missing convention, term, or stack law.
+description: Persist durable agent metadata after self-review, user review, PR comments, or a correction. Use when verdict.json metadata[], review feedback, or a user correction implies a missing convention, term, or stack law.
 ---
 
 # Agent memory
 
-Feedback is wasted if the next session repeats the same miss. When self-review (`verdict.json` / spawned `code-reviewer`) or user review (chat correction, PR comments) lands, update **one relevant file**. Do not batch. Do not invent.
+Feedback is wasted if the next session repeats the same miss. Prefer the **harness** over hand-editing.
 
-## When
+## Structured path (preferred)
 
-- Self-review wrote `verdict.json` and a finding is a **durable** convention (handshake, isolation, secrets, MCP ban, naming), not a one-off bug.
-- User or PR review corrects how agents should work on this repo or stack.
+1. On self-review, put durable misses in `verdict.json` as `metadata[]` (reviewer may only flag; parent may fill):
+
+```json
+{
+  "verdict": "good",
+  "summary": "one sentence",
+  "risks": [],
+  "metadata": [
+    {
+      "target": "agents",
+      "text": "Isolation default is native git worktree; treehouse is opt-in.",
+      "reason": "review assumed treehouse"
+    },
+    {
+      "target": "rule",
+      "path": ".claude/rules/python-tests.md",
+      "globs": ["**/*.py"],
+      "text": "Prefer pytest for new packages.",
+      "reason": "PR comment"
+    }
+  ]
+}
+```
+
+2. Conductor auto-applies when `agent_memory.auto_apply: true` (default), writing `memory-applied.json` in the run dir.
+3. Manual: `python3 ~/.claude/hooks/dev-loop/cli.py agent-memory --repo REPO --verdict PATH` (or `--key TICKET`).
+
+Targets: `agents` | `rule` | `context` | `readme`. Rules must be path-scoped (`globs`, never `always_apply`). Secrets/hooks paths are rejected. `durable: false` is rejected.
+
+## When (still apply by hand if no verdict)
+
+- User/PR review corrects how agents should work and you are not going through `verdict.json`.
 - A domain term or hard-to-reverse decision was resolved (`domain-glossary`).
 
 Skip: one-ticket AC, style nits, speculative rewrites, secrets, SessionStart text.
@@ -19,13 +49,13 @@ Skip: one-ticket AC, style nits, speculative rewrites, secrets, SessionStart tex
 
 | Signal | File | Rule |
 | ------ | ---- | ---- |
-| Convention every future agent on **this repo** must keep | that repo's `AGENTS.md` (or `CLAUDE.md` if it only `@`-includes AGENTS) | Rewrite or prune. No procedure dumps. |
-| Stack law missing for a path (Java, Python, TS, k8s, …) | path-scoped `.claude/rules` / `.cursor/rules` / repo `.envfiles/rules` | `alwaysApply: false` + `globs`. Never always-on. |
+| Convention every future agent on **this repo** must keep | `AGENTS.md` / `CLAUDE.md` | Harness appends under `## Agent memory`. |
+| Stack law missing for a path | path-scoped `.claude/rules` / `.cursor/rules` | `alwaysApply: false` + `globs`. |
 | Domain term | `CONTEXT.md` via `domain-glossary` | Glossary only. |
-| Hard to reverse + surprising + real trade-off | `docs/adr/` via `domain-glossary` | Skip unless all three. No empty ADRs. |
+| Hard to reverse + surprising + real trade-off | `docs/adr/` via `domain-glossary` | Skip unless all three. |
 | Install / usage / public API would be wrong | `README.md` | That case only. |
 
-The **reviewer is read-only**. It flags a metadata gap in the verdict (`metadata` or a risk). The **parent** (review skill, writer, or `pr-comment-fixer`) writes the file.
+Reviewer is read-only on metadata files. Parent writes `metadata[]` or calls the CLI.
 
 ## Do not
 

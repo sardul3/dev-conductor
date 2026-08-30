@@ -13,6 +13,7 @@ from gitutil import current_branch, default_branch, denylisted, github_remote, i
 from jira_client import get_issue
 from memory import load_or_build
 from paths import run_dir
+from agent_memory import apply_from_verdict
 from prompts import review_prompt, simplify_prompt, spec_prompt, test_writer_prompt, writer_prompt
 from evidence import capture_evidence
 from jira_workflow import progress
@@ -336,6 +337,18 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                     verdict = {"verdict": "needs_improvement", "summary": "unreadable verdict.json"}
             v = str(verdict.get("verdict") or "").lower().replace(" ", "-")
             verdict["verdict"] = v
+            if cfg.agent_memory.auto_apply and isinstance(verdict.get("metadata"), list) and verdict.get("metadata"):
+                results = apply_from_verdict(repo, verdict)
+                (run / "memory-applied.json").write_text(
+                    json.dumps(results, indent=2) + "\n", encoding="utf-8"
+                )
+                record(
+                    run,
+                    "agent-memory",
+                    "applied" if any(r.get("status") == "applied" for r in results) else "noop",
+                    ticket=key,
+                    note=str(len(results)),
+                )
             if v in set(cfg.review.pass_verdicts):
                 record(run, "review", "pass", ticket=key, note=v)
                 if cfg.stages_enabled.get("verify", True):

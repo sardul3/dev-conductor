@@ -64,7 +64,7 @@ def review_prompt(key: str, run: Path, repo: Path, spec: str) -> str:
         f"Write `{run / 'verdict.json'}` with keys verdict, summary, risks "
         f"(verdict one of: excellent, good, good-with-risks, needs_improvement, blocker).\n"
         f"Then write `{run / 'SESSION_DONE'}` and `{run / 'STAGE_DONE'}`.\n"
-        f"If the verdict flags a durable convention miss, load `agent-memory` and update one relevant file (parent writes; reviewer is read-only).\nDo not implement unless you are not the reviewer.\n\n"
+        f"If a durable convention miss appears, add it to `verdict.json` as `metadata[]` (`target` agents|rule|context|readme, `text`, optional `path`/`globs`/`reason`). The conductor applies it when `agent_memory.auto_apply` is on; otherwise load `agent-memory` / `cli.py agent-memory`. Reviewer is read-only on those files.\nDo not implement unless you are not the reviewer.\n\n"
         f"## Spec\n\n{spec}\n"
     )
 
@@ -83,7 +83,7 @@ def simplify_prompt(key: str, run: Path, repo: Path, spec: str) -> str:
 def comment_fixer_prompt(key: str, run: Path, repo: Path, comments: str) -> str:
     return (
         f"{SKIP}\n\n"
-        f"Load skill `pr-comment-fixer`. If a comment corrects a durable agent convention, also load `agent-memory` and update one relevant file. Ticket `{key}`. Repo `{repo}`.\n"
+        f"Load skill `pr-comment-fixer`. If a comment corrects a durable agent convention, write `metadata[]` into the run `verdict.json` (or a small `memory.json`) and run `cli.py agent-memory --repo … --verdict …`, or load `agent-memory`. Ticket `{key}`. Repo `{repo}`.\n"
         f"Address the PR comments. Simple nits: implement (tdd). Needs design: decide then implement.\n"
         f"Do not use GitHub MCP; use `gh`. After changes: commit if the loop already shipped, "
         f"push, `gh pr comment` a short note, re-request review.\n"

@@ -122,6 +122,10 @@ memory:
   max_contract_files: 24
   max_contract_lines: 80
 
+
+# Apply verdict.metadata[] into AGENTS.md / path-scoped rules after review.
+agent_memory:
+  auto_apply: true
 health: {}
 verify: {}
 verify_fail_closed: true
