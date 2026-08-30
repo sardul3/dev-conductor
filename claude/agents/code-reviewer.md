@@ -36,6 +36,9 @@ You are a staff engineer reviewing a **git diff**, not the author's chat. Do not
 ## Minor
 - `path:line` — suggestion
 
+## Metadata (optional)
+- If a finding is a durable convention missing from AGENTS.md / path-scoped rules / glossary, say so here. Do not Write those files (parent loads `agent-memory`).
+
 ## Good
 - what to keep
 

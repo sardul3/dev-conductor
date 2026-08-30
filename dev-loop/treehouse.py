@@ -79,7 +79,7 @@ def enforce_capacity(
     if n >= cap:
         raise SystemExit(
             f"dev-loop: {n} active runs (queue.max_active={cap}). "
-            "Finish a ticket, or `treehouse return PATH` to free a lease."
+            "Finish a ticket, or release its worktree/lease to free a slot."
         )
 
 
@@ -120,6 +120,77 @@ def acquire_lease(
     return Lease(path=Path(raw.splitlines()[0]).expanduser(), lease_id="", holder=holder, origin=origin)
 
 
+def worktree_path(origin: Path, key: str) -> Path:
+    origin = origin.resolve()
+    return origin.parent / f".{origin.name}-worktrees" / key
+
+
+def _default_branch(origin: Path, runner: Runner | None = None) -> str:
+    # Prefer gitutil when available; fall back for tests without network remotes.
+    try:
+        from gitutil import default_branch
+
+        return default_branch(origin)
+    except Exception:
+        pass
+    run = _run(runner)
+    for cand in ("main", "master"):
+        proc = run(
+            ["git", "-C", str(origin), "show-ref", "--verify", f"refs/heads/{cand}"],
+            capture_output=True,
+            text=True,
+        )
+        if getattr(proc, "returncode", 1) in (0, None):
+            return cand
+    proc = run(
+        ["git", "-C", str(origin), "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    return (getattr(proc, "stdout", None) or "HEAD").strip() or "HEAD"
+
+
+def _add_worktree(origin: Path, dest: Path, *, runner: Runner | None = None) -> Path:
+    dest = dest.expanduser()
+    if dest.exists():
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    branch = _default_branch(origin, runner=runner)
+    cmd = ["git", "-C", str(origin), "worktree", "add", "--detach", str(dest), branch]
+    try:
+        proc = _run(runner)(cmd, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise SystemExit("dev-loop: git not found; required for isolation=worktree") from exc
+    if getattr(proc, "returncode", 0) not in (0, None):
+        err = (getattr(proc, "stderr", None) or getattr(proc, "stdout", None) or "").strip()
+        raise SystemExit(f"dev-loop: git worktree add failed: {err or 'unknown error'}")
+    return dest
+
+
+def _remove_worktree(origin: Path, path: Path, *, runner: Runner | None = None) -> None:
+    cmd = ["git", "-C", str(origin), "worktree", "remove", "--force", str(path)]
+    try:
+        proc = _run(runner)(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        print(f"dev-loop: git missing; worktree still at {path}")
+        return
+    if getattr(proc, "returncode", 0) not in (0, None):
+        # Fallback: prune + rm if git no longer tracks it
+        err = (getattr(proc, "stderr", None) or getattr(proc, "stdout", None) or "").strip()
+        _run(runner)(
+            ["git", "-C", str(origin), "worktree", "prune"],
+            capture_output=True,
+            text=True,
+        )
+        if path.exists():
+            import shutil
+
+            shutil.rmtree(path, ignore_errors=True)
+        if path.exists():
+            print(f"dev-loop: git worktree remove failed ({err}); still at {path}")
+
+
+
 def prepare_workspace(
     origin: Path,
     cfg: DevLoopConfig,
@@ -130,6 +201,21 @@ def prepare_workspace(
 ) -> Path:
     enforce_capacity(cfg, runs_root=runs_root, exclude_key=run.name)
     isolation = (cfg.git.isolation or "none").strip().lower()
+    if isolation == "none":
+        return origin
+    if isolation == "worktree":
+        dest = worktree_path(origin, run.name)
+        path = _add_worktree(origin, dest, runner=runner)
+        branch = _default_branch(origin, runner=runner)
+        payload = {
+            "kind": "worktree",
+            "path": str(path),
+            "origin": str(origin.resolve()),
+            "branch": branch,
+        }
+        (run / "lease.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        record(run, "isolation", "leased", ticket=run.name, note=str(path))
+        return path
     if isolation != "treehouse":
         return origin
     holder = f"{cfg.git.treehouse_lease_holder}:{run.name}"
@@ -140,6 +226,7 @@ def prepare_workspace(
         runner=runner,
     )
     payload = {
+        "kind": "treehouse",
         "path": str(lease.path),
         "lease_id": lease.lease_id,
         "holder": lease.holder,
@@ -177,9 +264,6 @@ def release_lease(
     p = run / "lease.json"
     if not p.is_file():
         return
-    isolation = (cfg.git.isolation or "none").strip().lower()
-    if isolation != "treehouse":
-        return
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
@@ -187,9 +271,28 @@ def release_lease(
     if not isinstance(data, dict):
         return
     path = str(data.get("path") or "")
-    lease_id = str(data.get("lease_id") or "")
     if not path:
         return
+    kind = str(data.get("kind") or "").strip().lower()
+    isolation = (cfg.git.isolation or "none").strip().lower()
+    if not kind:
+        if data.get("lease_id"):
+            kind = "treehouse"
+        elif isolation == "worktree":
+            kind = "worktree"
+        else:
+            kind = isolation
+    if kind == "worktree":
+        origin = Path(str(data.get("origin") or "")).expanduser()
+        if not str(origin):
+            print(f"dev-loop: worktree lease missing origin; still at {path}")
+            return
+        _remove_worktree(origin, Path(path), runner=runner)
+        record(run, "isolation", "returned", ticket=run.name, note=path)
+        return
+    if kind != "treehouse":
+        return
+    lease_id = str(data.get("lease_id") or "")
     cmd = [cfg.git.treehouse_bin, "return", "--force"]
     if lease_id:
         cmd.extend(["--if-lease-id", lease_id])

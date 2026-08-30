@@ -5,7 +5,7 @@ DEST="${HOME}/.cursor/skills"
 AGENTS="${HOME}/.agents/skills"
 RULES="${HOME}/.cursor/rules"
 mkdir -p "${DEST}" "${AGENTS}" "${RULES}"
-for n in dev-loop story-spec test-writer repo-memory dev-loop-review pr-comment-fixer jira-progress lavish-ui tdd implement-terse verify-before-done systematic-debugging code-review; do
+for n in dev-loop story-spec test-writer repo-memory dev-loop-review pr-comment-fixer jira-progress lavish-ui tdd implement-terse verify-before-done systematic-debugging code-review agent-memory domain-glossary; do
   rm -rf "${DEST}/${n}" "${AGENTS}/${n}"
   cp -R "${ROOT}/skills/${n}" "${DEST}/${n}"
   cp -R "${ROOT}/skills/${n}" "${AGENTS}/${n}"

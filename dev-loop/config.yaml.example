@@ -47,9 +47,10 @@ git:
   stack_prs: false
   max_files_per_pr: 0
   merge_method: squash
-  # treehouse = isolated git worktree via `treehouse get --lease` (not a subshell).
+  # worktree = native `git worktree` under .{repo}-worktrees/{KEY} (default).
+  # treehouse = leased worktree via `treehouse get --lease`.
   # none = work in the clone you passed to start. Eval uses none.
-  isolation: treehouse
+  isolation: worktree
   treehouse_bin: treehouse
   treehouse_return_on_ship: true
   treehouse_lease_holder: dev-loop
@@ -72,6 +73,17 @@ runtime:
 caps:
   writer_retries: 3
   review_retries: 3
+  # 0 = off. Overnight / long unattended: set these so a runaway cannot eat the weekly quota.
+  # Worst-case spend is about max_launches × max_budget_usd (each Claude session gets --max-budget-usd).
+  max_launches: 0
+  max_tokens: 0
+  max_budget_usd: 0
+  wall_sec: 0
+  # overnight example:
+  # max_launches: 12
+  # max_tokens: 400000
+  # max_budget_usd: 2
+  # wall_sec: 28800
 
 review:
   pass_verdicts:
@@ -146,6 +158,14 @@ evidence:
   # probes:
   #   - method: GET
   #     url: http://127.0.0.1:8080/actuator/health
+
+# auto = on only for UI repos (React/Vue/shadcn/…). Force with on/off. Per-slug override in repos.
+lavish:
+  enabled: auto
+  repos: {}
+  # repos:
+  #   payments-api: off
+  #   design-system: on
 
 poller:
   enabled: false

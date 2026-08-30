@@ -49,3 +49,5 @@ Offer an ADR only when all three hold: hard to reverse, surprising without conte
 ## Decision
 ## Consequences
 ```
+
+When feedback (self-review or user/PR review) resolves a term or hard-to-reverse decision, update here. For non-glossary conventions (AGENTS.md, path-scoped rules), load `agent-memory` instead.

@@ -24,3 +24,5 @@ Review the **work product**, not the author's chain of thought.
 - Ask the reviewer to re-implement
 - Paste secrets
 - Treat style nits as blockers unless the project rules say so
+
+If a finding is a missing durable convention, flag it for the parent to apply via `agent-memory`. The reviewer does not Write metadata files.

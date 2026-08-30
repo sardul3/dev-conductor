@@ -16,3 +16,5 @@ Input: `pr-comments.md` in the run dir (`~/.config/dev-conductor/dev-loop/runs/K
 6. Write `STAGE_DONE` in the run dir.
 
 Do not use GitHub MCP or Jira MCP.
+
+If a review comment corrects a **durable** agent convention (handshake, isolation, secrets, stack law), load `agent-memory` and update one relevant file before `STAGE_DONE`. Skip one-ticket nits.

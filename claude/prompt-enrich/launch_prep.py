@@ -89,11 +89,24 @@ def _write_state(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
 
 
-def _runner_script(cwd: str, prompt_file: Path, route: Route) -> str:
+def _max_budget_usd(env: dict | None) -> str:
+    raw = str((env or {}).get("DEVLOOP_MAX_BUDGET_USD") or "").strip()
+    try:
+        val = float(raw)
+    except ValueError:
+        return ""
+    if val <= 0:
+        return ""
+    return f"{val:.4f}".rstrip("0").rstrip(".")
+
+
+def _runner_script(cwd: str, prompt_file: Path, route: Route, env: dict | None = None) -> str:
     cd = shlex.quote(cwd)
     prompt = shlex.quote(str(prompt_file))
     primary = shlex.quote(route.primary)
     fallback = shlex.quote(route.fallback)
+    budget = _max_budget_usd(env)
+    budget_flag = f" --max-budget-usd {budget}" if budget else ""
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
@@ -109,7 +122,7 @@ def _runner_script(cwd: str, prompt_file: Path, route: Route) -> str:
             '  echo "claude not on PATH. Prompt saved at $PROMPT_FILE"',
             "  exit 1",
             "fi",
-            f'exec claude --model {primary} --fallback-model {fallback} "$(cat "$PROMPT_FILE")"',
+            f'exec claude --model {primary} --fallback-model {fallback}{budget_flag} "$(cat "$PROMPT_FILE")"',
             "",
         ]
     )
@@ -178,7 +191,7 @@ def prepare_launch(
     except OSError:
         copied = None
     runner_file = runs / "launch.sh"
-    runner_file.write_text(_runner_script(cwd, prompt_file, route), encoding="utf-8")
+    runner_file.write_text(_runner_script(cwd, prompt_file, route, env), encoding="utf-8")
     runner_file.chmod(0o755)
     _write_state(
         state_path,

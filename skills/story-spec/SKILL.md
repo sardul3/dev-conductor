@@ -14,4 +14,6 @@ description: Turn a Jira story into a technical spec via grill. Use in the spec 
 
 Do not write application code. Do not open a PR.
 
-If the Jira issue is UI/UX (screens, layout, visual QA), you may load skill `lavish-ui` (spike). Keep AC in this `spec.md`. Do not replace the ticket with HTML.
+If the run dir has `lavish.json` with `enabled: true` and the issue is UI/UX, load `lavish-ui`. Keep AC in this `spec.md`. Do not replace the ticket with HTML.
+
+If grill exposes a missing durable convention for future agents, note it for the writer; do not invent AGENTS/rules during spec. After review feedback, `agent-memory` owns the write.

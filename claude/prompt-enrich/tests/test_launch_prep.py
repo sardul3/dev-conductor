@@ -125,6 +125,32 @@ class LaunchPrepTests(unittest.TestCase):
         runner = Path(result["runner_file"]).read_text(encoding="utf-8")
         self.assertIn("PROMPT_ENRICH_WORK_SESSION=1", runner)
 
+    def test_given_budget_env_when_prepare_then_runner_has_max_budget_usd(self) -> None:
+        result = prepare_launch(
+            CONTRACT,
+            session_id="sess-budget",
+            cwd=str(self.project),
+            home=self.home,
+            project_dir=self.project,
+            backend="anthropic",
+            env={"DEVLOOP_MAX_BUDGET_USD": "2.5"},
+        )
+        runner = Path(result["runner_file"]).read_text(encoding="utf-8")
+        self.assertIn("--max-budget-usd 2.5", runner)
+
+    def test_given_zero_budget_env_when_prepare_then_runner_omits_flag(self) -> None:
+        result = prepare_launch(
+            CONTRACT,
+            session_id="sess-budget-zero",
+            cwd=str(self.project),
+            home=self.home,
+            project_dir=self.project,
+            backend="anthropic",
+            env={"DEVLOOP_MAX_BUDGET_USD": "0"},
+        )
+        runner = Path(result["runner_file"]).read_text(encoding="utf-8")
+        self.assertNotIn("--max-budget-usd", runner)
+
 
 if __name__ == "__main__":
     unittest.main()

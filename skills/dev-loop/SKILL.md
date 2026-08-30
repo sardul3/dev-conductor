@@ -31,6 +31,6 @@ python3 ~/.claude/hooks/dev-loop/cli.py continue KEY
 Poller: `cli.py poll` / `install-poller`. Never commit `main`/`master`.
 Agent reads use brief output (`cli.py` with no args, `keys`, `status`, `progress`). Picker JSON is `--format json`. New connector: `brief.Connector` + `fetch()`.
 
-Long-run caps (`caps.max_launches` / `max_tokens` / `max_budget_usd` / `wall_sec`, 0 = off) stop further agent launches and write `STOPPED` in the run dir. Unattended still needs these set; they do not default on. Parallelism is `queue.max_active` (treehouse leases), not tmux fan-out.
+Long-run caps (`caps.max_launches` / `max_tokens` / `max_budget_usd` / `wall_sec`, 0 = off) stop further agent launches and write `STOPPED` in the run dir. Unattended still needs these set; they do not default on. Parallelism is `queue.max_active` (worktree/treehouse slots), not tmux fan-out.
 
-Isolation: example config uses `git.isolation: treehouse` (leased worktree) and `queue.max_active: 3`. Start from the clone under `~/dev`; do not `cd` into `~/.treehouse` yourself. A fourth in-progress ticket exits until one ships or you `treehouse return PATH`.
+Isolation: example config uses `git.isolation: worktree` (native git worktree under `.{repo}-worktrees/{KEY}`) and `queue.max_active: 3`. `treehouse` remains opt-in. Start from the clone under `~/dev`. A fourth in-progress ticket exits until one ships or you release its worktree/lease.

@@ -109,6 +109,9 @@ evidence:
   mode: http
   probes: []
 
+lavish:
+  enabled: off
+
 poller:
   enabled: false
   interval_minutes: 30

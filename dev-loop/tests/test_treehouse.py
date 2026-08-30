@@ -14,7 +14,36 @@ from treehouse import (
     count_active_runs,
     prepare_workspace,
     release_lease,
+    worktree_path,
 )
+
+
+
+import os
+import subprocess
+
+_GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "dev-loop-test",
+    "GIT_AUTHOR_EMAIL": "dev-loop-test@example.com",
+    "GIT_COMMITTER_NAME": "dev-loop-test",
+    "GIT_COMMITTER_EMAIL": "dev-loop-test@example.com",
+}
+
+
+def _init_origin(root: Path) -> Path:
+    origin = root / "origin"
+    origin.mkdir()
+    subprocess.run(["git", "init", "-b", "main", str(origin)], check=True, capture_output=True)
+    (origin / "README").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(origin), "add", "README"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(origin), "commit", "-m", "init"],
+        check=True,
+        capture_output=True,
+        env=_GIT_ENV,
+    )
+    return origin
 
 
 class _Proc:
@@ -134,10 +163,10 @@ class TreehouseTests(unittest.TestCase):
             self.assertIn("--force", argv)
             self.assertIn("lease-abc", argv)
 
-    def test_given_example_defaults_when_load_then_treehouse_and_max_active_three(self) -> None:
+    def test_given_example_defaults_when_load_then_worktree_and_max_active_three(self) -> None:
         root = Path(__file__).resolve().parents[1]
         cfg = load_config(root / "config.yaml.example")
-        self.assertEqual(cfg.git.isolation, "treehouse")
+        self.assertEqual(cfg.git.isolation, "worktree")
         self.assertEqual(cfg.queue.max_active, 3)
 
     def test_given_test_profile_when_load_then_isolation_none(self) -> None:
@@ -145,6 +174,68 @@ class TreehouseTests(unittest.TestCase):
         cfg = load_config(root / "config.test.yaml")
         self.assertEqual(cfg.git.isolation, "none")
         self.assertEqual(cfg.queue.max_active, 3)
+
+
+    def test_given_worktree_isolation_when_prepare_then_adds_detached_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            origin = _init_origin(root)
+            run = root / "runs" / "ASE-9"
+            run.mkdir(parents=True)
+            cfg = DevLoopConfig()
+            cfg.git.isolation = "worktree"
+            cfg.queue.max_active = 3
+            workspace = prepare_workspace(origin, cfg, run, runs_root=root / "runs")
+            expected = worktree_path(origin, "ASE-9")
+            self.assertEqual(workspace, expected)
+            self.assertTrue(workspace.is_dir())
+            data = json.loads((run / "lease.json").read_text(encoding="utf-8"))
+            self.assertEqual(data["kind"], "worktree")
+            self.assertEqual(data["path"], str(expected))
+            self.assertEqual(data["origin"], str(origin.resolve()))
+            listed = subprocess.run(
+                ["git", "-C", str(origin), "worktree", "list", "--porcelain"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertIn(str(expected), listed)
+
+    def test_given_worktree_lease_when_release_then_removes_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            origin = _init_origin(root)
+            run = root / "runs" / "ASE-9"
+            run.mkdir(parents=True)
+            cfg = DevLoopConfig()
+            cfg.git.isolation = "worktree"
+            cfg.queue.max_active = 3
+            workspace = prepare_workspace(origin, cfg, run, runs_root=root / "runs")
+            self.assertTrue(workspace.exists())
+            release_lease(run, cfg)
+            self.assertFalse(workspace.exists())
+            listed = subprocess.run(
+                ["git", "-C", str(origin), "worktree", "list", "--porcelain"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertNotIn("ASE-9", listed)
+
+    def test_given_existing_worktree_when_prepare_then_reuses_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            origin = _init_origin(root)
+            run = root / "runs" / "ASE-9"
+            run.mkdir(parents=True)
+            cfg = DevLoopConfig()
+            cfg.git.isolation = "worktree"
+            first = prepare_workspace(origin, cfg, run, runs_root=root / "runs")
+            (first / "scratch.txt").write_text("keep\n", encoding="utf-8")
+            second = prepare_workspace(origin, cfg, run, runs_root=root / "runs")
+            self.assertEqual(first, second)
+            self.assertEqual((second / "scratch.txt").read_text(encoding="utf-8"), "keep\n")
+
 
 
 if __name__ == "__main__":

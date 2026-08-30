@@ -64,7 +64,7 @@ class GitCfg:
     stack_prs: bool = False
     max_files_per_pr: int = 0
     merge_method: str = "squash"
-    # none = work in the clone. treehouse = `treehouse get --lease` (isolated worktree).
+    # none = work in the clone. worktree = native `git worktree`. treehouse = `treehouse get --lease`.
     isolation: str = "none"
     treehouse_bin: str = "treehouse"
     treehouse_return_on_ship: bool = True
@@ -91,6 +91,11 @@ class RuntimeCfg:
 class CapsCfg:
     writer_retries: int = 3
     review_retries: int = 3
+    # 0 = unlimited. Ticket-wide stop for long/unattended runs.
+    max_launches: int = 0
+    max_tokens: int = 0
+    max_budget_usd: float = 0.0
+    wall_sec: int = 0
 
 
 @dataclass
@@ -207,6 +212,17 @@ class EvidenceCfg:
 
 
 @dataclass
+class LavishCfg:
+    # auto = on only when the repo looks like UI (React/Vue/shadcn/…). on | off | auto.
+    enabled: str = "auto"
+    repos: dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.repos is None:
+            self.repos = {}
+
+
+@dataclass
 class PollerCfg:
     enabled: bool = False
     interval_minutes: int = 30
@@ -267,6 +283,7 @@ class DevLoopConfig:
     repo_pick: RepoPickCfg = field(default_factory=RepoPickCfg)
     quality: QualityCfg = field(default_factory=QualityCfg)
     evidence: EvidenceCfg = field(default_factory=EvidenceCfg)
+    lavish: LavishCfg = field(default_factory=LavishCfg)
     poller: PollerCfg = field(default_factory=PollerCfg)
     workflow: WorkflowCfg = field(default_factory=WorkflowCfg)
     autonomy: AutonomyCfg = field(default_factory=AutonomyCfg)
@@ -356,7 +373,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
     secrets = load_secrets()
     jira_d = data.get("jira") if isinstance(data.get("jira"), dict) else {}
     git_d = data.get("git") if isinstance(data.get("git"), dict) else {}
-    q_d = data.get("queue") if isinstance(data.get("queue"), dict) else {}
+    queue_d = data.get("queue") if isinstance(data.get("queue"), dict) else {}
     rt_d = data.get("runtime") if isinstance(data.get("runtime"), dict) else {}
     caps_d = data.get("caps") if isinstance(data.get("caps"), dict) else {}
     rev_d = data.get("review") if isinstance(data.get("review"), dict) else {}
@@ -365,6 +382,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
     stages_d = data.get("stages") if isinstance(data.get("stages"), dict) else {}
     q_d = data.get("quality") if isinstance(data.get("quality"), dict) else {}
     ev_d = data.get("evidence") if isinstance(data.get("evidence"), dict) else {}
+    lav_d = data.get("lavish") if isinstance(data.get("lavish"), dict) else {}
     pol_d = data.get("poller") if isinstance(data.get("poller"), dict) else {}
     wf_d = data.get("workflow") if isinstance(data.get("workflow"), dict) else {}
     aut_d = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
@@ -440,13 +458,13 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             stack_prs=bool(git_d.get("stack_prs", False)),
             max_files_per_pr=int(git_d.get("max_files_per_pr") or 0),
             merge_method=str(git_d.get("merge_method") or "squash"),
-            isolation=str(git_d.get("isolation") or "treehouse"),
+            isolation=str(git_d.get("isolation") or "worktree"),
             treehouse_bin=str(git_d.get("treehouse_bin") or "treehouse"),
             treehouse_return_on_ship=bool(git_d.get("treehouse_return_on_ship", True)),
             treehouse_lease_holder=str(git_d.get("treehouse_lease_holder") or "dev-loop"),
         ),
         queue=QueueCfg(
-            max_active=int(q_d.get("max_active") or 3),
+            max_active=int(queue_d.get("max_active") or 3),
         ),
         runtime=RuntimeCfg(
             agent=str(rt_d.get("agent") or "claude"),
@@ -460,6 +478,10 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
         caps=CapsCfg(
             writer_retries=int(caps_d.get("writer_retries") or 3),
             review_retries=int(caps_d.get("review_retries") or 3),
+            max_launches=int(caps_d.get("max_launches") or 0),
+            max_tokens=int(caps_d.get("max_tokens") or 0),
+            max_budget_usd=float(caps_d.get("max_budget_usd") or 0),
+            wall_sec=int(caps_d.get("wall_sec") or 0),
         ),
         review=ReviewCfg(
             pass_verdicts=_str_list(rev_d.get("pass_verdicts") or ["excellent", "good"]),
@@ -516,6 +538,12 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             timeout_sec=int(ev_d.get("timeout_sec") or 8),
             probes=list(ev_d.get("probes") or []) if isinstance(ev_d.get("probes"), list) else [],
             playwright_cmd=str(ev_d.get("playwright_cmd") or ""),
+        ),
+        lavish=LavishCfg(
+            enabled=str(lav_d.get("enabled") or "auto"),
+            repos={str(k): str(v) for k, v in (lav_d.get("repos") or {}).items()}
+            if isinstance(lav_d.get("repos"), dict)
+            else {},
         ),
         poller=PollerCfg(
             enabled=bool(pol_d.get("enabled", False)),

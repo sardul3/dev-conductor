@@ -17,4 +17,6 @@ description: Staff review for /dev-loop. Spawn code-reviewer on the diff, write 
 
 excellent/good → ship. Anything else → writer (caps in config). After cap, still ship with risks in the PR.
 
-4. Write `SESSION_DONE` and `STAGE_DONE`. Do not commit. Do not open a PR. Do not spawn extra marketplace agents.
+4. Write `SESSION_DONE` and `STAGE_DONE`. If the verdict shows a **durable** convention miss (not a one-off bug), load `agent-memory` and update one relevant file; do not invent ADRs or always-on rules.
+
+Do not commit. Do not open a PR. Do not spawn extra marketplace agents.

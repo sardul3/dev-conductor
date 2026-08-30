@@ -4,7 +4,7 @@ dev-conductor is the Jira-to-PR loop. Do not silently revert these:
 
 - Jira REST + `gh`, not Jira or GitHub MCP. Tickets stay the source of requirements.
 - Handshake files in the run dir: `SPEC_APPROVED`, `SESSION_DONE`. `SPEC_APPROVED` means the spec is accepted, not that the ticket is done.
-- Isolation: `git.isolation: treehouse` + `queue.max_active: 3`. Eval (`config.test.yaml`) uses `isolation: none`.
+- Isolation: `git.isolation: worktree` (default; native git worktree) + `queue.max_active: 3`. `treehouse` remains opt-in. Eval (`config.test.yaml`) uses `isolation: none`.
 - Secrets stay in `~/.config/dev-conductor/secrets.env`. Never commit them.
 - Procedures live in `skills/`. Stack law lives in `.envfiles/rules/` (path-scoped). Do not paste those bodies here.
 - Agent I/O is `brief/` (clip, 3–4 columns, count, empty, help[]). New connector: subclass `brief.Connector`, implement `fetch()`. Disk files stay JSON. Not AXI-branded.

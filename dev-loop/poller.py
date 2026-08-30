@@ -255,7 +255,12 @@ def _default_launch_fix(cfg: DevLoopConfig, item: dict[str, Any], pr: dict[str, 
     run = run_dir(key)
     (run / "pr-comments.md").write_text(comments_markdown(pr), encoding="utf-8")
     prompt = comment_fixer_prompt(key, run, repo, (run / "pr-comments.md").read_text(encoding="utf-8"))
-    launch_prompt(prompt, repo, run, "pr-comment-fixer", cfg)
+    from budget import BudgetExhausted
+
+    try:
+        launch_prompt(prompt, repo, run, "pr-comment-fixer", cfg)
+    except BudgetExhausted as exc:
+        print("dev-loop: poll fix skipped (budget) " + str(exc))
 
 
 def _default_done(cfg: DevLoopConfig, item: dict[str, Any]) -> None:

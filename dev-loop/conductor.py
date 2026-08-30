@@ -23,6 +23,8 @@ from verify_infer import run_verify
 from watch import add_watch
 from progress import backfill, record
 from treehouse import prepare_workspace, release_lease, workspace_for_run
+from budget import BudgetExhausted, check_and_charge, check_budget, counts_against_budget, remaining_session_usd, stop_run
+from lavish import decide_lavish
 
 ISSUE_KEY = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
 
@@ -82,6 +84,13 @@ def fetch_issue(key: str, cfg: DevLoopConfig | None = None) -> Path:
 def launch_prompt(prompt: str, repo: Path, run: Path, name: str, cfg: DevLoopConfig) -> Path:
     dest = run / f"prompt-{name}.md"
     dest.write_text(prompt, encoding="utf-8")
+    if counts_against_budget(cfg):
+        try:
+            check_and_charge(cfg, run, prompt=prompt, name=name)
+        except BudgetExhausted as exc:
+            stop_run(cfg, run, str(exc))
+            print(f"dev-loop: stopped — {exc}")
+            raise
     if cfg.runtime.no_launch or cfg.runtime.agent == "none" or os.environ.get("DEVLOOP_NO_LAUNCH") == "1":
         print(f"dev-loop: wrote {dest} (no_launch)")
         return dest
@@ -92,10 +101,15 @@ def launch_prompt(prompt: str, repo: Path, run: Path, name: str, cfg: DevLoopCon
     if not script.is_file():
         print(f"dev-loop: launch script missing ({script}). Prompt written to {dest}")
         return dest
+    env = os.environ.copy()
+    usd = remaining_session_usd(cfg, run)
+    if usd is not None:
+        env["DEVLOOP_MAX_BUDGET_USD"] = str(usd)
     subprocess.Popen(
         ["bash", str(script), "--file", str(dest), "--cwd", str(repo)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=env,
     )
     print(f"dev-loop: launched {name} → {dest}")
     return dest
@@ -176,8 +190,13 @@ def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
         p = run / name
         if p.is_file():
             p.unlink()
+    lv = decide_lavish(cfg, repo)
+    (run / "lavish.json").write_text(
+        json.dumps({"enabled": lv.enabled, "reason": lv.reason}, indent=2) + "\n",
+        encoding="utf-8",
+    )
     if cfg.stages_enabled.get("spec", True):
-        prompt = spec_prompt(key, run, repo, issue_markdown(issue))
+        prompt = spec_prompt(key, run, repo, issue_markdown(issue), lavish=lv.enabled)
         launch_prompt(prompt, repo, run, "spec", cfg)
         _maybe_adapter("spec", key, repo, run, cfg, issue=issue)
     if cfg.spec_auto_approve:
@@ -204,7 +223,18 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
     leased = (run / "lease.json").is_file()
     repo = workspace_for_run(run, origin)
     repo = require_repo(repo, cfg, check_location=not leased)
+    lv = decide_lavish(cfg, repo)
+    (run / "lavish.json").write_text(
+        json.dumps({"enabled": lv.enabled, "reason": lv.reason}, indent=2) + "\n",
+        encoding="utf-8",
+    )
     backfill(run)
+    if counts_against_budget(cfg):
+        ok, reason = check_budget(cfg, run)
+        if not ok:
+            stop_run(cfg, run, reason)
+            print(f"dev-loop: stopped — {reason}")
+            raise BudgetExhausted(reason)
     if not spec_is_approved(run):
         raise SystemExit(f"dev-loop: spec not approved — see {run / 'progress.md'}")
     if not (run / "SPEC_APPROVED").is_file() and (run / "APPROVED").is_file():
@@ -246,7 +276,7 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                 update_state(stage="writer", ticket=key, attempt=attempt)
                 record(run, "writer", "started", ticket=key, note=f"attempt {attempt}")
                 _clear_stage_done(run)
-                launch_prompt(writer_prompt(key, run, repo, spec, verify_log), repo, run, f"writer-{attempt}", cfg)
+                launch_prompt(writer_prompt(key, run, repo, spec, verify_log, lavish=lv.enabled), repo, run, f"writer-{attempt}", cfg)
                 _maybe_adapter("writer", key, repo, run, cfg, spec=spec, attempt=attempt)
                 if wait and not cfg.runtime.builtin_adapters and not wait_session_done(run, cfg):
                     raise SystemExit("dev-loop: writer timed out")
@@ -315,7 +345,7 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                         if attempt < review_n and cfg.stages_enabled.get("writer", True):
                             verify_log = (run / "verify.log").read_text(encoding="utf-8") if (run / "verify.log").is_file() else ""
                             launch_prompt(
-                                writer_prompt(key, run, repo, spec, f"verify failed after review\n{verify_log}"),
+                                writer_prompt(key, run, repo, spec, f"verify failed after review\n{verify_log}", lavish=lv.enabled),
                                 repo,
                                 run,
                                 f"rewrite-verify-{attempt}",
@@ -332,7 +362,7 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
             if v in set(cfg.review.rewrite_verdicts) and attempt < review_n and cfg.stages_enabled.get("writer", True):
                 update_state(stage="writer")
                 _clear_stage_done(run)
-                launch_prompt(writer_prompt(key, run, repo, spec, f"review: {v}\n{verdict}"), repo, run, f"rewrite-{attempt}", cfg)
+                launch_prompt(writer_prompt(key, run, repo, spec, f"review: {v}\n{verdict}", lavish=lv.enabled), repo, run, f"rewrite-{attempt}", cfg)
                 _maybe_adapter("writer", key, repo, run, cfg, spec=spec, attempt=attempt)
                 continue
             break
