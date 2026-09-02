@@ -1,0 +1,936 @@
+{
+  "schema_version": "1.0",
+  "project": {
+    "id": "retail-order-integration",
+    "title": "Retail order integration",
+    "version": "1.0.0",
+    "status": "in-review",
+    "description": "Reference production design for accepting customer and partner orders, committing them atomically, and publishing an idempotent fulfillment event.",
+    "cloud_provider": "azure",
+    "environments": ["dev", "test", "prod"],
+    "primary_region": "eastus2",
+    "secondary_region": null,
+    "owners": ["Retail Ordering Team", "Azure Platform Team", "SRE Team"],
+    "data_residency": "United States",
+    "classification": "confidential",
+    "reviewed_at": "2026-09-02"
+  },
+  "requirements": [
+    {
+      "id": "req-order-submit",
+      "type": "functional",
+      "text": "Customers and approved partners can submit an order exactly once from the caller perspective.",
+      "priority": "must",
+      "status": "confirmed",
+      "owner": "Retail Product Owner",
+      "acceptance": "A valid request returns an order ID and duplicate idempotency keys return the original result.",
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference scenario acceptance criterion."}]
+    },
+    {
+      "id": "req-availability",
+      "type": "availability",
+      "text": "The production order submission path meets 99.9% monthly availability.",
+      "priority": "must",
+      "status": "assumed",
+      "owner": "Retail Product Owner",
+      "acceptance": "Monthly SLI calculated at the edge is at least 99.9%, excluding approved maintenance.",
+      "evidence": [{"source": "proposal", "confidence": "medium", "note": "Reference SLO pending business confirmation."}]
+    },
+    {
+      "id": "req-recovery",
+      "type": "availability",
+      "text": "Order data recovery meets RPO 15 minutes and RTO 60 minutes.",
+      "priority": "must",
+      "status": "assumed",
+      "owner": "SRE Team",
+      "acceptance": "A quarterly restore exercise recovers the service within 60 minutes with no more than 15 minutes of committed order loss.",
+      "evidence": [{"source": "proposal", "confidence": "medium", "note": "Reference recovery objective pending operational approval."}]
+    },
+    {
+      "id": "req-latency",
+      "type": "performance",
+      "text": "Order submission completes within 800 ms at p95 under the approved peak load.",
+      "priority": "must",
+      "status": "assumed",
+      "owner": "Retail Product Owner",
+      "acceptance": "A production-like load test demonstrates p95 under 800 ms with error rate below 0.5%.",
+      "evidence": [{"source": "proposal", "confidence": "medium", "note": "Reference latency target for the example."}]
+    },
+    {
+      "id": "req-security",
+      "type": "security",
+      "text": "All public and workload access is authenticated, least privilege, encrypted, logged, and protected from common web abuse.",
+      "priority": "must",
+      "status": "confirmed",
+      "owner": "Security Architecture",
+      "acceptance": "Threat review and policy evidence show WAF, mTLS or OIDC, workload identity, private data access, encryption, and audit logging.",
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference security gate for the example."}]
+    },
+    {
+      "id": "req-data",
+      "type": "data",
+      "text": "Order and customer data remains in approved US regions with seven-year order retention and audited access.",
+      "priority": "must",
+      "status": "confirmed",
+      "owner": "Data Governance",
+      "acceptance": "Region, retention, deletion, backup, and access-log controls are configured and evidenced.",
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference data-governance rule for the example."}]
+    },
+    {
+      "id": "req-operations",
+      "type": "operations",
+      "text": "The service has reproducible delivery, end-to-end telemetry, actionable alerts, runbooks, and tested rollback and restore.",
+      "priority": "must",
+      "status": "confirmed",
+      "owner": "SRE Team",
+      "acceptance": "Release and game-day evidence shows health verification, rollback, alert ownership, runbooks, and restore success.",
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference operational gate for the example."}]
+    },
+    {
+      "id": "req-cost",
+      "type": "cost",
+      "text": "The workload has cost ownership, budgets, anomaly alerts, and quarterly right-sizing review.",
+      "priority": "should",
+      "status": "confirmed",
+      "owner": "Retail Ordering Team",
+      "acceptance": "Budget and anomaly alerts are active and a quarterly unit-cost review is scheduled.",
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference FinOps requirement for the example."}]
+    },
+    {
+      "id": "req-ui-order-experience",
+      "type": "functional",
+      "text": "Customers can review and submit an order through a responsive, accessible, retry-safe web experience.",
+      "priority": "must",
+      "status": "confirmed",
+      "owner": "Retail Experience Team",
+      "acceptance": "Compact and wide layouts cover default, loading, empty, error, success, permission-denied, and offline behavior; keyboard and screen-reader tests pass WCAG 2.2 AA acceptance criteria; duplicate submission is prevented with the same idempotency key.",
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference UI implementation and acceptance contract."}]
+    }
+  ],
+  "platform": {
+    "azure": {
+      "landing_zone": {
+        "management_group": "corp/workloads/online",
+        "subscription_strategy": "Separate nonproduction and production application landing-zone subscriptions",
+        "policy_scope": "Management group baseline with workload subscription assignments and time-bound exemptions",
+        "tags_required": ["owner", "application", "environment", "cost-center", "data-classification", "criticality"],
+        "budgets": true,
+        "locks": "CanNotDelete on production data and shared observability resources"
+      },
+      "network": {
+        "topology": "Hub-spoke with platform-owned hub and workload spoke",
+        "ingress": "Azure Front Door Premium WAF to private API Management origin",
+        "egress": "Azure Firewall through hub with application rules and FQDN logging",
+        "dns": "Azure Private DNS zones linked through platform DNS resolver",
+        "private_endpoints": true,
+        "controlled_egress": true,
+        "waf": true,
+        "ddos": true
+      },
+      "identity": {
+        "human": "Microsoft Entra ID with Conditional Access and access reviews",
+        "workload": "Microsoft Entra Workload ID and managed identities",
+        "least_privilege_rbac": true,
+        "pim": true,
+        "secrets_store": "Azure Key Vault with CSI Secret Store and rotation",
+        "break_glass": true
+      },
+      "security": {
+        "defender": true,
+        "sentinel": true,
+        "encryption_in_transit": true,
+        "encryption_at_rest": true,
+        "customer_managed_keys": false,
+        "diagnostic_settings": true
+      },
+      "reliability": {
+        "availability_zones": true,
+        "multi_region": false,
+        "rto_minutes": 60,
+        "rpo_minutes": 15,
+        "restore_tested": true
+      },
+      "cost": {
+        "owner": "Retail Ordering Team",
+        "budget": true,
+        "right_sizing": true,
+        "anomaly_alerts": true,
+        "unit_cost": "Cost per accepted order"
+      }
+    },
+    "kubernetes": {
+      "enabled": true,
+      "service": "Azure Kubernetes Service",
+      "justification": "The organization already operates a shared AKS application platform and the order API requires the same policy, GitOps, and operational controls as adjacent services.",
+      "private_cluster": true,
+      "supported_version_policy": "Remain within Microsoft-supported N-1 minor version and supported Azure Linux node image",
+      "upgrade_channel": "stable",
+      "maintenance_window": "Sunday 03:00-07:00 UTC with SRE change ownership",
+      "zones": 3,
+      "node_pools": "Dedicated system pool plus autoscaled user pool spread across three zones",
+      "workload_defaults": {
+        "replicas_min": 3,
+        "readiness_probe": true,
+        "liveness_probe": true,
+        "startup_probe": true,
+        "requests_limits": true,
+        "hpa": "CPU plus request-concurrency signal, 3-20 replicas",
+        "pdb": true,
+        "topology_spread": true,
+        "graceful_termination": true
+      },
+      "network": {
+        "default_deny": true,
+        "controlled_egress": true,
+        "ingress": "Private internal ingress behind API Management",
+        "network_policy": "Cilium policies with explicit DNS, data, messaging, and telemetry allowances"
+      },
+      "security": {
+        "pod_security_standard": "restricted",
+        "run_as_non_root": true,
+        "allow_privilege_escalation": false,
+        "read_only_root_filesystem": true,
+        "seccomp_runtime_default": true,
+        "drop_all_capabilities": true,
+        "workload_identity": true,
+        "external_secrets": true,
+        "admission_policy": "Azure Policy and signed-image admission controls"
+      },
+      "supply_chain": {
+        "digest_pinning": true,
+        "image_scanning": true,
+        "sbom": true,
+        "signing": true,
+        "provenance": "Signed SLSA provenance retained with the release"
+      },
+      "operations": {
+        "gitops": "Flux v2 with environment promotion pull requests",
+        "backup_restore": "GitOps bootstrap plus PostgreSQL point-in-time restore and quarterly recovery exercise",
+        "observability": "Managed Prometheus, Azure Monitor, Application Insights, control-plane and audit logs"
+      }
+    },
+    "delivery": {
+      "iac": "Terraform with reviewed modules and remote state",
+      "ci_cd": "Azure DevOps pipelines",
+      "gitops": "Flux v2",
+      "immutable_artifacts": true,
+      "sbom": true,
+      "signing": true,
+      "policy_gates": true,
+      "health_verification": true,
+      "rollback": "Progressive rollout aborts to the prior signed digest; database changes remain backward compatible"
+    },
+    "operations": {
+      "logs": "Structured application, edge, API Management, AKS, PostgreSQL, Service Bus, and audit logs in Log Analytics",
+      "metrics": "Azure Monitor managed Prometheus plus service and business metrics",
+      "traces": "OpenTelemetry traces correlated through Application Insights",
+      "slos": "Availability and latency SLIs at Front Door with dependency indicators",
+      "alerts": "Error-budget, latency, saturation, queue, DLQ, database, certificate, and restore alerts with SRE ownership",
+      "runbooks": "Order path, dependency degradation, DLQ replay, credential rotation, rollback, and restore runbooks",
+      "backup_restore_tested": true
+    }
+  },
+  "controls": [
+    {
+      "id": "ctl-edge-protection",
+      "name": "Edge protection",
+      "domain": "security",
+      "description": "Protect public order entry points and restrict origin access.",
+      "implementation": "Front Door Premium WAF, bot and rate rules, DDoS decision, TLS policy, and private APIM origin.",
+      "owner": "Azure Platform Team",
+      "status": "proposed",
+      "requirements": ["req-security", "req-availability"],
+      "risks": ["risk-public-abuse"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state edge control."}]
+    },
+    {
+      "id": "ctl-workload-identity",
+      "name": "Workload identity and secrets",
+      "domain": "identity",
+      "description": "Remove embedded credentials and scope Azure access to individual workloads.",
+      "implementation": "Entra Workload ID, managed identities, Key Vault CSI, least-privilege RBAC, rotation, and access logging.",
+      "owner": "Security Architecture",
+      "status": "proposed",
+      "requirements": ["req-security"],
+      "risks": ["risk-credential-misuse"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state identity control."}]
+    },
+    {
+      "id": "ctl-private-data",
+      "name": "Private data plane",
+      "domain": "data-protection",
+      "description": "Keep confidential stores and messaging off the public internet.",
+      "implementation": "Private endpoints, Private DNS, firewall egress, encryption, database RBAC, and audited access.",
+      "owner": "Azure Platform Team",
+      "status": "proposed",
+      "requirements": ["req-security", "req-data"],
+      "risks": ["risk-data-exposure"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state private connectivity control."}]
+    },
+    {
+      "id": "ctl-atomic-outbox",
+      "name": "Atomic outbox",
+      "domain": "reliability",
+      "description": "Prevent an accepted order from being lost between database commit and event publication.",
+      "implementation": "Order and outbox row commit in one PostgreSQL transaction; worker publishes idempotently and records completion.",
+      "owner": "Retail Ordering Team",
+      "status": "proposed",
+      "requirements": ["req-order-submit", "req-availability"],
+      "risks": ["risk-event-loss", "risk-duplicate-event"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state consistency pattern."}]
+    },
+    {
+      "id": "ctl-observability",
+      "name": "End-to-end observability",
+      "domain": "operations",
+      "description": "Correlate customer outcome, service behavior, dependency health, and event delivery.",
+      "implementation": "OpenTelemetry correlation, structured logs, managed Prometheus, Application Insights, SLO dashboards, alerts, and runbooks.",
+      "owner": "SRE Team",
+      "status": "proposed",
+      "requirements": ["req-operations", "req-availability", "req-latency"],
+      "risks": ["risk-undetected-failure"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state telemetry control."}]
+    },
+    {
+      "id": "ctl-k8s-baseline",
+      "name": "Restricted AKS workload baseline",
+      "domain": "security",
+      "description": "Enforce production-safe workload, network, and disruption defaults.",
+      "implementation": "Restricted PSS, non-root, seccomp, no privilege escalation, dropped capabilities, requests/limits, probes, PDB, topology spread, HPA, and default-deny policy.",
+      "owner": "Azure Platform Team",
+      "status": "proposed",
+      "requirements": ["req-security", "req-availability", "req-operations"],
+      "risks": ["risk-cluster-misconfiguration"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state AKS workload policy."}]
+    },
+    {
+      "id": "ctl-supply-chain",
+      "name": "Software supply-chain integrity",
+      "domain": "supply-chain",
+      "description": "Promote only reviewed, scanned, signed, immutable artifacts.",
+      "implementation": "Dependency and secret scan, image scan, SBOM, signed provenance, digest promotion, admission verification, and health-gated GitOps rollout.",
+      "owner": "DevSecOps Team",
+      "status": "proposed",
+      "requirements": ["req-security", "req-operations"],
+      "risks": ["risk-supply-chain"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state delivery control."}]
+    },
+    {
+      "id": "ctl-backup-restore",
+      "name": "Tested backup and restore",
+      "domain": "reliability",
+      "description": "Recover order state and platform configuration within the agreed objectives.",
+      "implementation": "PostgreSQL PITR, immutable backup protection, GitOps bootstrap, quarterly restore exercise, and measured RTO/RPO evidence.",
+      "owner": "SRE Team",
+      "status": "proposed",
+      "requirements": ["req-recovery", "req-data", "req-operations"],
+      "risks": ["risk-region-outage"],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state recovery control."}]
+    },
+    {
+      "id": "ctl-cost-governance",
+      "name": "FinOps guardrails",
+      "domain": "cost",
+      "description": "Make workload cost visible and owned.",
+      "implementation": "Required tags, budgets, anomaly alerts, autoscaling bounds, log-retention limits, and quarterly cost-per-order review.",
+      "owner": "Retail Ordering Team",
+      "status": "proposed",
+      "requirements": ["req-cost"],
+      "risks": [],
+      "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state FinOps control."}]
+    }
+  ],
+  "components": [
+    {"id": "customer", "name": "Customer", "kind": "actor", "description": "Retail customer placing an order.", "technology": "Human user", "owner": "Retail Product Owner", "criticality": "high", "data_classification": "confidential", "lifecycle": "external", "public_exposure": "none", "requirements": ["req-order-submit"], "controls": ["ctl-edge-protection"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference actor."}]},
+    {"id": "partner-system", "name": "Approved partner", "kind": "external-system", "description": "Approved partner submitting orders through a contracted API.", "technology": "Partner API client", "owner": "Partner Integration Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "external", "public_exposure": "public", "requirements": ["req-order-submit", "req-security"], "controls": ["ctl-edge-protection"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference external producer."}]},
+    {"id": "fulfillment-system", "name": "Fulfillment system", "kind": "external-system", "description": "Consumes accepted order events for fulfillment.", "technology": "External event consumer", "owner": "Fulfillment Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "existing", "public_exposure": "private", "requirements": ["req-order-submit"], "controls": ["ctl-private-data", "ctl-atomic-outbox"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference downstream consumer."}]},
+    {"id": "oncall-team", "name": "SRE on-call", "kind": "actor", "description": "Responds to actionable service alerts.", "technology": "Incident management", "owner": "SRE Team", "criticality": "high", "data_classification": "internal", "lifecycle": "existing", "public_exposure": "none", "requirements": ["req-operations"], "controls": ["ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference operations actor."}]},
+    {"id": "order-platform", "name": "Order platform", "kind": "generic", "description": "Logical context boundary for order intake, persistence, and event publication.", "technology": "Azure-hosted system", "owner": "Retail Ordering Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "changed", "public_exposure": "public", "requirements": ["req-order-submit", "req-availability", "req-security", "req-data", "req-operations"], "controls": ["ctl-edge-protection", "ctl-private-data", "ctl-observability"], "scaling": "Scales at edge, API, worker, and messaging tiers", "evidence": [{"source": "proposal", "confidence": "high", "note": "Logical system context boundary."}]},
+    {"id": "web-app", "name": "Retail web app", "kind": "client", "description": "Customer-facing web client.", "technology": "Web application", "owner": "Retail Experience Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "existing", "public_exposure": "public", "requirements": ["req-order-submit", "req-latency"], "controls": ["ctl-edge-protection"], "scaling": "CDN and browser delivery", "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference web client."}]},
+    {"id": "front-door", "name": "Global edge", "kind": "gateway", "description": "Public TLS edge, WAF, rate limiting, and origin restriction.", "technology": "Azure Front Door Premium", "azure_service": "front-door", "owner": "Azure Platform Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "public", "region": "global", "sku": "Premium", "scaling": "Managed global edge capacity", "requirements": ["req-availability", "req-latency", "req-security"], "controls": ["ctl-edge-protection", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed Azure edge service."}]},
+    {"id": "api-management", "name": "Order API gateway", "kind": "gateway", "description": "Private origin that authenticates, authorizes, versions, throttles, and audits the API.", "technology": "Azure API Management", "azure_service": "api-management", "owner": "API Platform Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-edge", "sku": "Premium v2", "scaling": "Two or more zone-aware units after load validation", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security"], "controls": ["ctl-edge-protection", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed API policy boundary."}]},
+    {"id": "order-api", "name": "Order API", "kind": "service", "description": "Validates idempotency, authorizes the caller, and commits the order plus outbox atomically.", "technology": "Spring Boot on AKS", "owner": "Retail Ordering Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-app", "namespace": "orders-prod", "sku": "3-20 replicas on user pool", "scaling": "HPA on CPU and request concurrency with three minimum replicas", "persistence": "Stateless; PostgreSQL is system of record", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security", "req-data", "req-operations"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-atomic-outbox", "ctl-observability", "ctl-k8s-baseline", "ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed order write service."}]},
+    {"id": "outbox-worker", "name": "Outbox publisher", "kind": "worker", "description": "Publishes committed outbox rows to Service Bus and records successful publication.", "technology": "Spring Boot worker on AKS", "owner": "Retail Ordering Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "none", "region": "eastus2", "resource_group": "rg-order-prod-app", "namespace": "orders-prod", "sku": "3-20 replicas on user pool", "scaling": "KEDA on outbox backlog with three minimum replicas", "persistence": "Stateless; outbox state in PostgreSQL", "requirements": ["req-order-submit", "req-availability", "req-operations"], "controls": ["ctl-workload-identity", "ctl-atomic-outbox", "ctl-observability", "ctl-k8s-baseline", "ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed transactional outbox publisher."}]},
+    {"id": "order-db", "name": "Order database", "kind": "database", "description": "System of record for orders, idempotency keys, and outbox state.", "technology": "Azure Database for PostgreSQL Flexible Server", "azure_service": "postgresql", "owner": "Retail Ordering Team", "criticality": "mission-critical", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-data", "sku": "Zone-redundant HA, exact tier after load test", "scaling": "Vertical and read capacity reviewed against measured load", "persistence": "PITR with immutable backup policy and quarterly restore", "requirements": ["req-order-submit", "req-availability", "req-recovery", "req-latency", "req-security", "req-data"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-atomic-outbox", "ctl-observability", "ctl-backup-restore"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed system of record."}]},
+    {"id": "service-bus", "name": "Order event bus", "kind": "message-broker", "description": "Durable order event topic with consumer subscription and dead-letter handling.", "technology": "Azure Service Bus Premium", "azure_service": "service-bus", "owner": "Integration Platform Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-integration", "sku": "Premium, capacity after throughput test", "scaling": "Messaging units and partitioning based on measured peak", "persistence": "Durable topic, subscription, DLQ, and bounded retention", "requirements": ["req-order-submit", "req-availability", "req-security", "req-data", "req-operations"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-atomic-outbox", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed durable event transport."}]},
+    {"id": "service-bus-dlq", "name": "Order event DLQ", "kind": "message-broker", "description": "Quarantines messages that exceed delivery or validation policy for owned replay.", "technology": "Azure Service Bus dead-letter subqueue", "azure_service": "service-bus", "owner": "Integration Platform Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-integration", "sku": "Part of Service Bus Premium namespace", "scaling": "Alert before retention or capacity threshold", "persistence": "Bounded DLQ retention with audited replay", "requirements": ["req-order-submit", "req-operations"], "controls": ["ctl-private-data", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed poison-message boundary."}]},
+    {"id": "entra-id", "name": "Identity provider", "kind": "identity", "description": "Authenticates humans, partners, and workload identities.", "technology": "Microsoft Entra ID", "azure_service": "entra-id", "owner": "Identity Platform Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "existing", "public_exposure": "public", "region": "global", "scaling": "Microsoft-managed", "requirements": ["req-security"], "controls": ["ctl-workload-identity", "ctl-edge-protection"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference identity service."}]},
+    {"id": "key-vault", "name": "Secrets and certificates", "kind": "security", "description": "Manages secrets, keys, and certificates with private access, rotation, and logging.", "technology": "Azure Key Vault", "azure_service": "key-vault", "owner": "Security Platform Team", "criticality": "high", "data_classification": "restricted", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-security", "sku": "Premium if HSM-backed keys are required", "scaling": "Service limits monitored", "persistence": "Soft delete and purge protection", "requirements": ["req-security", "req-operations"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed secret and certificate authority."}]},
+    {"id": "azure-monitor", "name": "Telemetry platform", "kind": "observability", "description": "Collects correlated logs, metrics, traces, SLOs, dashboards, and alerts.", "technology": "Azure Monitor, Log Analytics, Application Insights, Managed Prometheus", "azure_service": "azure-monitor", "owner": "SRE Team", "criticality": "high", "data_classification": "confidential", "lifecycle": "changed", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-ops", "sku": "Retention and ingestion tiers governed by data policy", "scaling": "Managed ingestion with quotas and cost alerts", "persistence": "Retention by telemetry class", "requirements": ["req-availability", "req-latency", "req-security", "req-data", "req-operations", "req-cost"], "controls": ["ctl-observability", "ctl-cost-governance"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state observability platform."}]},
+    {"id": "git-repository", "name": "Application and IaC repositories", "kind": "repository", "description": "Reviewed source of application, infrastructure, policy, and environment configuration.", "technology": "Azure Repos Git", "owner": "DevSecOps Team", "criticality": "high", "data_classification": "internal", "lifecycle": "existing", "public_exposure": "private", "scaling": "Managed service", "requirements": ["req-security", "req-operations"], "controls": ["ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference source repository."}]},
+    {"id": "build-pipeline", "name": "Build and security pipeline", "kind": "pipeline", "description": "Builds, tests, scans, creates SBOM and provenance, signs, and promotes artifacts.", "technology": "Azure DevOps Pipelines", "owner": "DevSecOps Team", "criticality": "high", "data_classification": "internal", "lifecycle": "changed", "public_exposure": "private", "scaling": "Managed parallel agents with protected production environment", "requirements": ["req-security", "req-operations"], "controls": ["ctl-supply-chain", "ctl-cost-governance"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Target-state build pipeline."}]},
+    {"id": "container-registry", "name": "Signed image registry", "kind": "storage", "description": "Stores immutable, scanned, signed workload images and metadata.", "technology": "Azure Container Registry Premium", "azure_service": "container-registry", "owner": "DevSecOps Team", "criticality": "high", "data_classification": "internal", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-shared", "sku": "Premium with private endpoint", "scaling": "Managed registry capacity and retention", "persistence": "Immutable release tags plus digest references", "requirements": ["req-security", "req-operations"], "controls": ["ctl-private-data", "ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed image registry."}]},
+    {"id": "flux-gitops", "name": "GitOps reconciler", "kind": "pipeline", "description": "Reconciles approved environment configuration and signed image digests into AKS.", "technology": "Flux v2", "owner": "Azure Platform Team", "criticality": "high", "data_classification": "internal", "lifecycle": "new", "public_exposure": "none", "namespace": "flux-system", "scaling": "Highly available controllers", "requirements": ["req-security", "req-operations"], "controls": ["ctl-k8s-baseline", "ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed GitOps delivery controller."}]},
+    {"id": "recovery-vault", "name": "Protected recovery data", "kind": "storage", "description": "Represents protected database backups and recovery metadata.", "technology": "Azure-managed PostgreSQL backup and recovery controls", "azure_service": "storage-account", "owner": "SRE Team", "criticality": "mission-critical", "data_classification": "confidential", "lifecycle": "new", "public_exposure": "private", "region": "eastus2", "resource_group": "rg-order-prod-recovery", "sku": "Policy-defined backup retention", "scaling": "Managed", "persistence": "PITR and protected retention aligned to recovery objectives", "requirements": ["req-recovery", "req-data", "req-operations"], "controls": ["ctl-private-data", "ctl-backup-restore"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Logical recovery component."}]}
+  ],
+  "relationships": [
+    {"id": "rel-customer-platform", "from": "customer", "to": "order-platform", "label": "Place and track order", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "OIDC", "mode": "sync", "encrypted": true, "data": ["customer and order data"], "timeout": "End-to-end 8 seconds", "retry": "Caller retries only with same idempotency key", "idempotency": "Required request idempotency key", "ordering": "Not applicable", "failure_behavior": "Return a bounded error without duplicate order creation.", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security"], "controls": ["ctl-edge-protection", "ctl-atomic-outbox"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Context-level customer interaction."}]},
+    {"id": "rel-partner-platform", "from": "partner-system", "to": "order-platform", "label": "Submit contracted order API", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "mTLS plus OAuth2 client credentials", "mode": "sync", "encrypted": true, "data": ["partner order data"], "timeout": "End-to-end 8 seconds", "retry": "Exponential backoff with same idempotency key", "idempotency": "Required partner idempotency key", "ordering": "Not applicable", "failure_behavior": "Return contract error or retriable status without duplicate creation.", "requirements": ["req-order-submit", "req-security"], "controls": ["ctl-edge-protection", "ctl-atomic-outbox"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Context-level partner interaction."}]},
+    {"id": "rel-customer-web", "from": "customer", "to": "web-app", "label": "Enter order", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "OIDC with PKCE", "mode": "sync", "encrypted": true, "data": ["customer and order data"], "timeout": "Browser interaction budget 8 seconds", "retry": "UI reuses idempotency key", "idempotency": "Per checkout attempt", "ordering": "Not applicable", "failure_behavior": "Preserve cart and show a retry-safe error.", "requirements": ["req-order-submit", "req-latency", "req-security"], "controls": ["ctl-edge-protection"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Primary customer interaction."}]},
+    {"id": "rel-web-frontdoor", "from": "web-app", "to": "front-door", "label": "Create order request", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "OIDC access token", "mode": "sync", "encrypted": true, "data": ["customer and order data"], "timeout": "8 seconds total client budget", "retry": "One bounded retry with same idempotency key", "idempotency": "Idempotency-Key header", "ordering": "Not applicable", "failure_behavior": "Fail closed and preserve retry context.", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security"], "controls": ["ctl-edge-protection", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed public request path."}]},
+    {"id": "rel-partner-frontdoor", "from": "partner-system", "to": "front-door", "label": "Partner create order", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "mTLS plus OAuth2 client credentials", "mode": "sync", "encrypted": true, "data": ["partner order data"], "timeout": "8 seconds total partner budget", "retry": "Exponential backoff with same idempotency key", "idempotency": "Partner idempotency key", "ordering": "Not applicable", "failure_behavior": "Rate-limit or reject safely without partial acceptance.", "requirements": ["req-order-submit", "req-security"], "controls": ["ctl-edge-protection"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed partner entry path."}]},
+    {"id": "rel-frontdoor-apim", "from": "front-door", "to": "api-management", "label": "Forward approved request", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "Private Link origin plus managed certificate", "mode": "sync", "encrypted": true, "data": ["validated order request"], "timeout": "7 seconds remaining budget", "retry": "No unsafe gateway retry for POST", "idempotency": "Header forwarded unchanged", "ordering": "Not applicable", "failure_behavior": "Return a standardized edge error and emit correlation telemetry.", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security"], "controls": ["ctl-edge-protection", "ctl-private-data", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed private origin path."}]},
+    {"id": "rel-apim-api", "from": "api-management", "to": "order-api", "label": "Authorize and invoke order API", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "Entra workload identity and validated caller claims", "mode": "sync", "encrypted": true, "data": ["validated order request and caller claims"], "timeout": "6 seconds", "retry": "No gateway retry for non-idempotent call unless same idempotency key", "idempotency": "Idempotency-Key required", "ordering": "Not applicable", "failure_behavior": "Return policy-safe error with correlation ID.", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security"], "controls": ["ctl-workload-identity", "ctl-observability", "ctl-k8s-baseline"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed API invocation contract."}]},
+    {"id": "rel-api-db", "from": "order-api", "to": "order-db", "label": "Commit order and outbox atomically", "direction": "forward", "protocol": "PostgreSQL TLS", "port": 5432, "auth": "Entra workload identity", "mode": "sync", "encrypted": true, "data": ["confidential order data", "idempotency key", "outbox event"], "timeout": "2 seconds statement and 4 seconds transaction budget", "retry": "Only serialization or transient errors with bounded retry", "idempotency": "Unique idempotency key and transaction constraint", "ordering": "Database transaction order", "failure_behavior": "Rollback the entire transaction and return no accepted order.", "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security", "req-data"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-atomic-outbox", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed atomic persistence contract."}]},
+    {"id": "rel-worker-db", "from": "outbox-worker", "to": "order-db", "label": "Claim unpublished outbox rows", "direction": "forward", "protocol": "PostgreSQL TLS", "port": 5432, "auth": "Entra workload identity", "mode": "batch", "encrypted": true, "data": ["confidential outbox event"], "timeout": "2 seconds per poll transaction", "retry": "Exponential backoff with jitter", "idempotency": "Row claim and publication state", "ordering": "Per aggregate sequence", "failure_behavior": "Leave rows unpublished for retry and alert on backlog age.", "requirements": ["req-order-submit", "req-availability", "req-security", "req-operations"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-atomic-outbox", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed outbox polling contract."}]},
+    {"id": "rel-worker-bus", "from": "outbox-worker", "to": "service-bus", "label": "Publish OrderCreated v2", "direction": "forward", "protocol": "AMQP over TLS", "port": 5671, "auth": "Entra workload identity", "mode": "async", "encrypted": true, "data": ["confidential order event"], "timeout": "5 seconds send timeout", "retry": "Exponential backoff with circuit breaker and backlog retention", "idempotency": "Stable event ID from outbox row", "ordering": "Session or aggregate key where required", "failure_behavior": "Keep outbox row pending, back off, alert on age, and never acknowledge publication early.", "requirements": ["req-order-submit", "req-availability", "req-security", "req-data", "req-operations"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-atomic-outbox", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed event publication contract."}]},
+    {"id": "rel-bus-fulfillment", "from": "service-bus", "to": "fulfillment-system", "label": "Deliver OrderCreated v2", "direction": "forward", "protocol": "AMQP over TLS", "port": 5671, "auth": "Entra application identity", "mode": "async", "encrypted": true, "data": ["confidential order event"], "timeout": "Consumer lock and processing budget defined by subscription", "retry": "Bounded redelivery then dead-letter", "idempotency": "Consumer records stable event ID", "ordering": "Per order aggregate when required", "failure_behavior": "Redeliver, then dead-letter with alert and owned replay.", "requirements": ["req-order-submit", "req-availability", "req-security", "req-data", "req-operations"], "controls": ["ctl-private-data", "ctl-atomic-outbox", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed fulfillment delivery contract."}]},
+    {"id": "rel-bus-dlq", "from": "service-bus", "to": "service-bus-dlq", "label": "Dead-letter exhausted delivery", "direction": "forward", "protocol": "Service Bus internal", "port": null, "auth": "Namespace policy", "mode": "async", "encrypted": true, "data": ["confidential failed order event and diagnostic metadata"], "timeout": "After configured delivery count", "retry": "No automatic replay from DLQ", "idempotency": "Original event ID retained", "ordering": "Original sequence metadata retained", "failure_behavior": "Alert owner and require audited, idempotent replay.", "requirements": ["req-order-submit", "req-operations"], "controls": ["ctl-private-data", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed poison-message path."}]},
+    {"id": "rel-api-entra", "from": "order-api", "to": "entra-id", "label": "Acquire workload token", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "Federated workload identity", "mode": "sync", "encrypted": true, "data": ["workload identity assertion"], "timeout": "2 seconds with cached token", "retry": "Bounded retry with jitter", "idempotency": "Token acquisition is replay safe", "ordering": "Not applicable", "failure_behavior": "Fail closed for protected operations and alert sustained failures.", "requirements": ["req-security"], "controls": ["ctl-workload-identity", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed workload token path."}]},
+    {"id": "rel-api-keyvault", "from": "order-api", "to": "key-vault", "label": "Read versioned configuration secret", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "Entra workload identity", "mode": "sync", "encrypted": true, "data": ["restricted secret material"], "timeout": "2 seconds with bounded local cache", "retry": "Bounded retry with circuit breaker", "idempotency": "Read only", "ordering": "Not applicable", "failure_behavior": "Use unexpired cached value for bounded period or fail closed.", "requirements": ["req-security", "req-operations"], "controls": ["ctl-workload-identity", "ctl-private-data", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed secret access path."}]},
+    {"id": "rel-api-monitor", "from": "order-api", "to": "azure-monitor", "label": "Emit correlated service telemetry", "direction": "forward", "protocol": "OTLP over TLS", "port": 4317, "auth": "Managed identity", "mode": "stream", "encrypted": true, "data": ["confidential operational telemetry with redaction"], "timeout": "Nonblocking bounded exporter", "retry": "Buffered retry with drop policy", "idempotency": "Telemetry event IDs", "ordering": "Best effort", "failure_behavior": "Do not block orders; surface exporter loss metrics.", "requirements": ["req-availability", "req-latency", "req-security", "req-data", "req-operations"], "controls": ["ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed API telemetry flow."}]},
+    {"id": "rel-worker-monitor", "from": "outbox-worker", "to": "azure-monitor", "label": "Emit backlog and publish telemetry", "direction": "forward", "protocol": "OTLP over TLS", "port": 4317, "auth": "Managed identity", "mode": "stream", "encrypted": true, "data": ["operational telemetry"], "timeout": "Nonblocking bounded exporter", "retry": "Buffered retry with drop policy", "idempotency": "Telemetry event IDs", "ordering": "Best effort", "failure_behavior": "Do not block publication; alert on telemetry exporter loss.", "requirements": ["req-availability", "req-operations"], "controls": ["ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed worker telemetry flow."}]},
+    {"id": "rel-bus-monitor", "from": "service-bus", "to": "azure-monitor", "label": "Export queue and DLQ metrics", "direction": "forward", "protocol": "Azure diagnostics", "port": 443, "auth": "Managed diagnostic setting", "mode": "stream", "encrypted": true, "data": ["operational metrics and logs"], "timeout": "Managed service delivery", "retry": "Managed diagnostic delivery", "idempotency": "Diagnostic record identity", "ordering": "Best effort", "failure_behavior": "Alert on diagnostic pipeline health and retain service metrics.", "requirements": ["req-availability", "req-operations"], "controls": ["ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed messaging diagnostics."}]},
+    {"id": "rel-db-monitor", "from": "order-db", "to": "azure-monitor", "label": "Export database health and audit logs", "direction": "forward", "protocol": "Azure diagnostics", "port": 443, "auth": "Managed diagnostic setting", "mode": "stream", "encrypted": true, "data": ["database metrics and audited access"], "timeout": "Managed service delivery", "retry": "Managed diagnostic delivery", "idempotency": "Diagnostic record identity", "ordering": "Best effort", "failure_behavior": "Alert on diagnostic pipeline health while retaining platform metrics.", "requirements": ["req-availability", "req-latency", "req-security", "req-data", "req-operations"], "controls": ["ctl-observability", "ctl-private-data"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed database diagnostics."}]},
+    {"id": "rel-monitor-oncall", "from": "azure-monitor", "to": "oncall-team", "label": "Route actionable SLO alert", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "Managed incident connector", "mode": "async", "encrypted": true, "data": ["incident metadata without order payload"], "timeout": "Alert delivery under 60 seconds", "retry": "Escalation and delivery retry policy", "idempotency": "Stable incident key", "ordering": "Severity and creation time", "failure_behavior": "Escalate through secondary notification channel.", "requirements": ["req-availability", "req-operations"], "controls": ["ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed incident notification."}]},
+    {"id": "rel-git-pipeline", "from": "git-repository", "to": "build-pipeline", "label": "Trigger reviewed build", "direction": "forward", "protocol": "HTTPS", "port": 443, "auth": "Entra identity and protected branch", "mode": "async", "encrypted": true, "data": ["source revision and pipeline metadata"], "timeout": "Pipeline queue policy", "retry": "Manual or policy retry from immutable revision", "idempotency": "Commit SHA", "ordering": "Per branch and environment", "failure_behavior": "Block promotion and report the failed gate.", "requirements": ["req-security", "req-operations"], "controls": ["ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed build trigger."}]},
+    {"id": "rel-pipeline-registry", "from": "build-pipeline", "to": "container-registry", "label": "Push scanned and signed image", "direction": "forward", "protocol": "OCI over HTTPS", "port": 443, "auth": "Federated pipeline identity", "mode": "sync", "encrypted": true, "data": ["image, SBOM, signature, provenance"], "timeout": "15 minute artifact push budget", "retry": "Bounded artifact retry by digest", "idempotency": "Content digest", "ordering": "Not applicable", "failure_behavior": "Block promotion when push, scan, or signing fails.", "requirements": ["req-security", "req-operations"], "controls": ["ctl-private-data", "ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed immutable artifact publication."}]},
+    {"id": "rel-git-flux", "from": "git-repository", "to": "flux-gitops", "label": "Reconcile approved environment commit", "direction": "forward", "protocol": "Git over HTTPS", "port": 443, "auth": "Scoped deploy identity", "mode": "async", "encrypted": true, "data": ["declarative environment configuration and image digest"], "timeout": "One-minute reconciliation interval", "retry": "Continuous bounded reconciliation", "idempotency": "Git commit and desired state", "ordering": "Git commit order", "failure_behavior": "Keep last known desired state and alert reconciliation failure.", "requirements": ["req-security", "req-operations"], "controls": ["ctl-k8s-baseline", "ctl-supply-chain", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed GitOps source flow."}]},
+    {"id": "rel-registry-flux", "from": "container-registry", "to": "flux-gitops", "label": "Verify signed image digest", "direction": "forward", "protocol": "OCI over HTTPS", "port": 443, "auth": "Scoped workload identity", "mode": "sync", "encrypted": true, "data": ["image digest, signature, provenance"], "timeout": "2 minute verification budget", "retry": "Bounded verification retry", "idempotency": "Content digest", "ordering": "Not applicable", "failure_behavior": "Block reconciliation of an unverified artifact.", "requirements": ["req-security", "req-operations"], "controls": ["ctl-private-data", "ctl-supply-chain"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed artifact verification."}]},
+    {"id": "rel-flux-api", "from": "flux-gitops", "to": "order-api", "label": "Apply health-gated deployment", "direction": "forward", "protocol": "Kubernetes API TLS", "port": 443, "auth": "Scoped Kubernetes service account", "mode": "async", "encrypted": true, "data": ["deployment specification and signed digest"], "timeout": "Progressive rollout deadline 15 minutes", "retry": "Continuous reconciliation with rollback policy", "idempotency": "Declarative desired state", "ordering": "Git revision order", "failure_behavior": "Abort rollout, retain prior healthy digest, and alert owner.", "requirements": ["req-availability", "req-security", "req-operations"], "controls": ["ctl-k8s-baseline", "ctl-supply-chain", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed GitOps deployment."}]},
+    {"id": "rel-db-backup", "from": "order-db", "to": "recovery-vault", "label": "Protect PITR backup and recovery metadata", "direction": "forward", "protocol": "Azure managed backup", "port": 443, "auth": "Managed service identity", "mode": "stream", "encrypted": true, "data": ["confidential encrypted database backup"], "timeout": "Continuous log backup and scheduled base backup", "retry": "Managed backup retry with failure alert", "idempotency": "Backup generation identity", "ordering": "Database log sequence", "failure_behavior": "Alert backup failure and retain prior protected restore points.", "requirements": ["req-recovery", "req-security", "req-data", "req-operations"], "controls": ["ctl-private-data", "ctl-backup-restore", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed backup flow."}]},
+    {"id": "rel-backup-db", "from": "recovery-vault", "to": "order-db", "label": "Restore selected recovery point", "direction": "forward", "protocol": "Azure managed restore", "port": 443, "auth": "PIM-approved recovery identity", "mode": "batch", "encrypted": true, "data": ["confidential encrypted database restore"], "timeout": "Complete within 60-minute RTO", "retry": "Runbook-controlled retry after validation", "idempotency": "Named restore operation", "ordering": "Selected recovery point", "failure_behavior": "Preserve source, alert incident command, and select prior valid recovery point.", "requirements": ["req-recovery", "req-security", "req-data", "req-operations"], "controls": ["ctl-private-data", "ctl-backup-restore", "ctl-observability"], "evidence": [{"source": "proposal", "confidence": "high", "note": "Proposed restore flow."}]}
+  ],
+  "views": [
+    {
+      "id": "system-context",
+      "title": "01 · System context",
+      "type": "system-context",
+      "purpose": "Agree the order-platform boundary, actors, external systems, and primary business exchanges.",
+      "width": 1600,
+      "height": 900,
+      "boundaries": [{"id": "order-system-boundary", "label": "Order platform · Retail Ordering Team", "kind": "system", "x": 520, "y": 180, "w": 560, "h": 440}],
+      "nodes": [
+        {"component": "customer", "x": 100, "y": 250, "w": 180, "h": 100},
+        {"component": "partner-system", "x": 100, "y": 470, "w": 180, "h": 100},
+        {"component": "order-platform", "x": 680, "y": 330, "w": 240, "h": 130, "boundary": "order-system-boundary"},
+        {"component": "fulfillment-system", "x": 1250, "y": 360, "w": 200, "h": 110}
+      ],
+      "edges": ["rel-customer-platform", "rel-partner-platform"],
+      "legend": {"mode": "auto", "x": 1210, "y": 660},
+      "requirements": ["req-order-submit", "req-availability", "req-security", "req-data", "req-operations"],
+      "decisions": ["dec-azure-aks", "dec-transactional-outbox"]
+    },
+    {
+      "id": "logical-containers",
+      "title": "02 · Logical services and integrations",
+      "type": "container",
+      "purpose": "Show service responsibilities, durable state, primary request path, and asynchronous fulfillment path.",
+      "width": 1800,
+      "height": 1000,
+      "boundaries": [
+        {"id": "public-zone", "label": "Public clients", "kind": "trust", "x": 50, "y": 110, "w": 320, "h": 700},
+        {"id": "application-zone", "label": "Order application boundary", "kind": "system", "x": 410, "y": 110, "w": 900, "h": 700},
+        {"id": "external-zone", "label": "Downstream domain", "kind": "trust", "x": 1350, "y": 110, "w": 380, "h": 700}
+      ],
+      "nodes": [
+        {"component": "customer", "x": 100, "y": 180, "w": 180, "h": 90, "boundary": "public-zone"},
+        {"component": "web-app", "x": 100, "y": 330, "w": 180, "h": 90, "boundary": "public-zone"},
+        {"component": "partner-system", "x": 100, "y": 560, "w": 180, "h": 90, "boundary": "public-zone"},
+        {"component": "front-door", "x": 450, "y": 200, "w": 180, "h": 100, "boundary": "application-zone"},
+        {"component": "api-management", "x": 700, "y": 200, "w": 190, "h": 100, "boundary": "application-zone"},
+        {"component": "order-api", "x": 960, "y": 200, "w": 180, "h": 100, "boundary": "application-zone"},
+        {"component": "order-db", "x": 960, "y": 430, "w": 180, "h": 110, "boundary": "application-zone"},
+        {"component": "outbox-worker", "x": 700, "y": 620, "w": 190, "h": 100, "boundary": "application-zone"},
+        {"component": "service-bus", "x": 1080, "y": 640, "w": 180, "h": 100, "boundary": "application-zone"},
+        {"component": "fulfillment-system", "x": 1440, "y": 350, "w": 200, "h": 110, "boundary": "external-zone"},
+        {"component": "service-bus-dlq", "x": 1440, "y": 590, "w": 200, "h": 100, "boundary": "external-zone"}
+      ],
+      "edges": ["rel-customer-web", "rel-web-frontdoor", "rel-partner-frontdoor", "rel-frontdoor-apim", "rel-apim-api", "rel-api-db", "rel-worker-db", "rel-worker-bus", "rel-bus-fulfillment", "rel-bus-dlq"],
+      "legend": {"mode": "auto", "x": 1380, "y": 760},
+      "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security", "req-data"],
+      "decisions": ["dec-transactional-outbox", "dec-service-bus"]
+    },
+    {
+      "id": "azure-deployment-network",
+      "title": "03 · Azure deployment and network",
+      "type": "deployment",
+      "purpose": "Review landing-zone placement, private data paths, AKS namespace placement, ingress, egress, and observability ownership.",
+      "width": 1800,
+      "height": 1050,
+      "boundaries": [
+        {"id": "azure-tenant", "label": "Microsoft Entra tenant", "kind": "tenant", "x": 220, "y": 100, "w": 1500, "h": 860},
+        {"id": "prod-subscription", "label": "Production application landing-zone subscription", "kind": "subscription", "x": 270, "y": 140, "w": 1400, "h": 780, "parent": "azure-tenant"},
+        {"id": "eastus2-region", "label": "East US 2 · approved US region", "kind": "region", "x": 310, "y": 180, "w": 1320, "h": 700, "parent": "prod-subscription"},
+        {"id": "order-vnet", "label": "Order workload spoke VNet", "kind": "vnet", "x": 360, "y": 230, "w": 1130, "h": 580, "parent": "eastus2-region"},
+        {"id": "ingress-subnet", "label": "Private ingress subnet", "kind": "subnet", "x": 400, "y": 280, "w": 270, "h": 220, "parent": "order-vnet"},
+        {"id": "aks-cluster", "label": "Private AKS cluster · Azure Platform Team", "kind": "cluster", "x": 710, "y": 280, "w": 420, "h": 410, "parent": "order-vnet"},
+        {"id": "orders-namespace", "label": "orders-prod namespace · Retail Ordering Team", "kind": "namespace", "x": 750, "y": 330, "w": 340, "h": 300, "parent": "aks-cluster"},
+        {"id": "data-subnet", "label": "Private endpoint subnet", "kind": "subnet", "x": 1170, "y": 280, "w": 270, "h": 410, "parent": "order-vnet"}
+      ],
+      "nodes": [
+        {"component": "front-door", "x": 300, "y": 350, "w": 170, "h": 100, "boundary": "prod-subscription"},
+        {"component": "api-management", "x": 440, "y": 340, "w": 190, "h": 110, "boundary": "ingress-subnet"},
+        {"component": "order-api", "x": 780, "y": 380, "w": 150, "h": 95, "boundary": "orders-namespace"},
+        {"component": "outbox-worker", "x": 900, "y": 510, "w": 155, "h": 90, "boundary": "orders-namespace"},
+        {"component": "order-db", "x": 1210, "y": 340, "w": 180, "h": 100, "boundary": "data-subnet"},
+        {"component": "service-bus", "x": 1210, "y": 520, "w": 180, "h": 100, "boundary": "data-subnet"},
+        {"component": "key-vault", "x": 500, "y": 650, "w": 170, "h": 100, "boundary": "order-vnet"},
+        {"component": "azure-monitor", "x": 1410, "y": 750, "w": 180, "h": 100, "boundary": "eastus2-region"}
+      ],
+      "edges": ["rel-frontdoor-apim", "rel-apim-api", "rel-api-db", "rel-worker-db", "rel-worker-bus", "rel-api-keyvault", "rel-api-monitor", "rel-worker-monitor", "rel-bus-monitor", "rel-db-monitor"],
+      "legend": {"mode": "auto", "x": 1440, "y": 180},
+      "requirements": ["req-availability", "req-recovery", "req-latency", "req-security", "req-data", "req-operations", "req-cost"],
+      "decisions": ["dec-azure-aks", "dec-single-region-zonal"]
+    },
+    {
+      "id": "security-trust",
+      "title": "04 · Security, identity, and trust boundaries",
+      "type": "security",
+      "purpose": "Review public exposure, authentication, workload identity, secret access, private data plane, and audited telemetry.",
+      "width": 1700,
+      "height": 950,
+      "boundaries": [
+        {"id": "untrusted-internet", "label": "Untrusted internet", "kind": "trust", "x": 40, "y": 120, "w": 300, "h": 650},
+        {"id": "edge-trust-zone", "label": "Managed edge trust zone", "kind": "trust", "x": 390, "y": 120, "w": 320, "h": 650},
+        {"id": "workload-trust-zone", "label": "Private workload trust zone", "kind": "trust", "x": 760, "y": 120, "w": 430, "h": 650},
+        {"id": "data-trust-zone", "label": "Confidential data trust zone", "kind": "data-residency", "x": 1240, "y": 120, "w": 410, "h": 650}
+      ],
+      "nodes": [
+        {"component": "web-app", "x": 90, "y": 220, "w": 180, "h": 95, "boundary": "untrusted-internet"},
+        {"component": "partner-system", "x": 90, "y": 500, "w": 180, "h": 95, "boundary": "untrusted-internet"},
+        {"component": "front-door", "x": 455, "y": 220, "w": 190, "h": 100, "boundary": "edge-trust-zone"},
+        {"component": "api-management", "x": 455, "y": 480, "w": 190, "h": 100, "boundary": "edge-trust-zone"},
+        {"component": "order-api", "x": 820, "y": 240, "w": 180, "h": 100, "boundary": "workload-trust-zone"},
+        {"component": "entra-id", "x": 930, "y": 520, "w": 190, "h": 100, "boundary": "workload-trust-zone"},
+        {"component": "order-db", "x": 1290, "y": 210, "w": 180, "h": 100, "boundary": "data-trust-zone"},
+        {"component": "service-bus", "x": 1420, "y": 410, "w": 180, "h": 100, "boundary": "data-trust-zone"},
+        {"component": "key-vault", "x": 1290, "y": 600, "w": 180, "h": 100, "boundary": "data-trust-zone"}
+      ],
+      "edges": ["rel-web-frontdoor", "rel-partner-frontdoor", "rel-frontdoor-apim", "rel-apim-api", "rel-api-db", "rel-api-entra", "rel-api-keyvault"],
+      "legend": {"mode": "auto", "x": 50, "y": 800},
+      "requirements": ["req-security", "req-data", "req-operations"],
+      "decisions": ["dec-private-data-plane", "dec-workload-identity"]
+    },
+    {
+      "id": "data-flow",
+      "title": "05 · Data flow and classification",
+      "type": "data-flow",
+      "purpose": "Trace confidential order data from entry through atomic persistence, event delivery, operational telemetry, retention, and recovery.",
+      "width": 1800,
+      "height": 950,
+      "boundaries": [
+        {"id": "confidential-order-data", "label": "Confidential order-data boundary · US residency", "kind": "data-residency", "x": 350, "y": 130, "w": 1380, "h": 650}
+      ],
+      "nodes": [
+        {"component": "web-app", "x": 70, "y": 280, "w": 180, "h": 95},
+        {"component": "order-api", "x": 430, "y": 280, "w": 180, "h": 100, "boundary": "confidential-order-data"},
+        {"component": "order-db", "x": 760, "y": 210, "w": 180, "h": 105, "boundary": "confidential-order-data"},
+        {"component": "outbox-worker", "x": 760, "y": 480, "w": 180, "h": 100, "boundary": "confidential-order-data"},
+        {"component": "service-bus", "x": 1080, "y": 480, "w": 180, "h": 100, "boundary": "confidential-order-data"},
+        {"component": "fulfillment-system", "x": 1420, "y": 270, "w": 200, "h": 105, "boundary": "confidential-order-data"},
+        {"component": "azure-monitor", "x": 1080, "y": 650, "w": 180, "h": 100, "boundary": "confidential-order-data"},
+        {"component": "recovery-vault", "x": 1420, "y": 600, "w": 200, "h": 105, "boundary": "confidential-order-data"}
+      ],
+      "edges": ["rel-api-db", "rel-worker-db", "rel-worker-bus", "rel-bus-fulfillment", "rel-api-monitor", "rel-worker-monitor", "rel-bus-monitor", "rel-db-monitor", "rel-db-backup"],
+      "legend": {"mode": "auto", "x": 50, "y": 720},
+      "requirements": ["req-order-submit", "req-security", "req-data", "req-recovery", "req-operations"],
+      "decisions": ["dec-transactional-outbox", "dec-private-data-plane"]
+    },
+    {
+      "id": "order-sequence",
+      "title": "06 · Critical order sequence",
+      "type": "sequence",
+      "purpose": "Review the success path and durable handoff from customer request to fulfillment event.",
+      "width": 1800,
+      "height": 1050,
+      "boundaries": [],
+      "nodes": [],
+      "edges": [],
+      "participants": ["web-app", "front-door", "api-management", "order-api", "order-db", "outbox-worker", "service-bus", "fulfillment-system"],
+      "interactions": [
+        {"id": "seq-create-order", "from": "web-app", "to": "front-door", "label": "POST /orders with OIDC token and idempotency key", "kind": "sync"},
+        {"id": "seq-edge-approved", "from": "front-door", "to": "api-management", "label": "Forward WAF-approved request to private origin", "kind": "sync"},
+        {"id": "seq-policy-check", "from": "api-management", "to": "order-api", "label": "Validate contract and authorize claims", "kind": "sync"},
+        {"id": "seq-atomic-commit", "from": "order-api", "to": "order-db", "label": "Commit order, idempotency key, and outbox row", "kind": "sync", "note": "One transaction prevents accepted order/event divergence."},
+        {"id": "seq-order-response", "from": "order-api", "to": "web-app", "label": "201 Created with stable order ID", "kind": "return"},
+        {"id": "seq-claim-outbox", "from": "outbox-worker", "to": "order-db", "label": "Claim unpublished outbox row", "kind": "async"},
+        {"id": "seq-publish-event", "from": "outbox-worker", "to": "service-bus", "label": "Publish OrderCreated v2 with stable event ID", "kind": "async"},
+        {"id": "seq-fulfillment-event", "from": "service-bus", "to": "fulfillment-system", "label": "Deliver event with bounded redelivery and DLQ", "kind": "async"}
+      ],
+      "legend": {"mode": "auto", "x": 1490, "y": 800},
+      "requirements": ["req-order-submit", "req-availability", "req-latency", "req-security", "req-operations"],
+      "decisions": ["dec-transactional-outbox", "dec-service-bus"]
+    },
+    {
+      "id": "aks-runtime",
+      "title": "07 · AKS workload runtime",
+      "type": "kubernetes",
+      "purpose": "Review cluster and namespace ownership, workload defaults, identity, secret delivery, private dependencies, GitOps, and telemetry.",
+      "width": 1750,
+      "height": 980,
+      "boundaries": [
+        {"id": "aks-runtime-cluster", "label": "Private AKS cluster · three availability zones", "kind": "cluster", "x": 260, "y": 120, "w": 1020, "h": 690},
+        {"id": "orders-runtime-namespace", "label": "orders-prod · Restricted PSS · default-deny network policy", "kind": "namespace", "x": 340, "y": 210, "w": 720, "h": 480, "parent": "aks-runtime-cluster"}
+      ],
+      "nodes": [
+        {"component": "flux-gitops", "x": 1080, "y": 200, "w": 160, "h": 90, "boundary": "aks-runtime-cluster"},
+        {"component": "order-api", "x": 430, "y": 300, "w": 180, "h": 100, "boundary": "orders-runtime-namespace"},
+        {"component": "outbox-worker", "x": 760, "y": 480, "w": 180, "h": 100, "boundary": "orders-runtime-namespace"},
+        {"component": "key-vault", "x": 1360, "y": 180, "w": 180, "h": 100},
+        {"component": "order-db", "x": 1360, "y": 390, "w": 180, "h": 100},
+        {"component": "service-bus", "x": 1360, "y": 600, "w": 180, "h": 100},
+        {"component": "azure-monitor", "x": 640, "y": 820, "w": 190, "h": 100}
+      ],
+      "edges": ["rel-flux-api", "rel-api-keyvault", "rel-api-db", "rel-worker-db", "rel-worker-bus", "rel-api-monitor", "rel-worker-monitor"],
+      "legend": {"mode": "auto", "x": 1330, "y": 760},
+      "requirements": ["req-availability", "req-latency", "req-security", "req-operations", "req-cost"],
+      "decisions": ["dec-azure-aks", "dec-workload-identity"]
+    },
+    {
+      "id": "delivery-gitops",
+      "title": "08 · Delivery and GitOps controls",
+      "type": "ci-cd",
+      "purpose": "Review source, build, scan, SBOM, signing, immutable promotion, admission verification, health-gated rollout, and rollback.",
+      "width": 1700,
+      "height": 900,
+      "boundaries": [
+        {"id": "delivery-control-plane", "label": "DevSecOps delivery control plane", "kind": "trust", "x": 110, "y": 130, "w": 1450, "h": 560}
+      ],
+      "nodes": [
+        {"component": "git-repository", "x": 180, "y": 280, "w": 190, "h": 100, "boundary": "delivery-control-plane"},
+        {"component": "build-pipeline", "x": 500, "y": 280, "w": 190, "h": 100, "boundary": "delivery-control-plane"},
+        {"component": "container-registry", "x": 820, "y": 190, "w": 190, "h": 105, "boundary": "delivery-control-plane"},
+        {"component": "flux-gitops", "x": 820, "y": 460, "w": 190, "h": 100, "boundary": "delivery-control-plane"},
+        {"component": "order-api", "x": 1180, "y": 330, "w": 180, "h": 100, "boundary": "delivery-control-plane"},
+        {"component": "azure-monitor", "x": 1380, "y": 720, "w": 190, "h": 100}
+      ],
+      "edges": ["rel-git-pipeline", "rel-pipeline-registry", "rel-git-flux", "rel-registry-flux", "rel-flux-api", "rel-api-monitor"],
+      "legend": {"mode": "auto", "x": 80, "y": 730},
+      "requirements": ["req-availability", "req-security", "req-operations", "req-cost"],
+      "decisions": ["dec-gitops-supply-chain"]
+    },
+    {
+      "id": "observability-operations",
+      "title": "09 · Observability and operational ownership",
+      "type": "observability",
+      "purpose": "Review telemetry sources, correlation, SLO evaluation, alerts, on-call ownership, and nonblocking exporter behavior.",
+      "width": 1700,
+      "height": 900,
+      "boundaries": [
+        {"id": "workload-telemetry", "label": "Workload and managed-service telemetry sources", "kind": "system", "x": 80, "y": 130, "w": 980, "h": 560},
+        {"id": "operations-plane", "label": "SRE operations plane", "kind": "trust", "x": 1110, "y": 130, "w": 500, "h": 560}
+      ],
+      "nodes": [
+        {"component": "order-api", "x": 160, "y": 230, "w": 180, "h": 100, "boundary": "workload-telemetry"},
+        {"component": "outbox-worker", "x": 440, "y": 230, "w": 180, "h": 100, "boundary": "workload-telemetry"},
+        {"component": "service-bus", "x": 160, "y": 470, "w": 180, "h": 100, "boundary": "workload-telemetry"},
+        {"component": "order-db", "x": 440, "y": 470, "w": 180, "h": 100, "boundary": "workload-telemetry"},
+        {"component": "azure-monitor", "x": 780, "y": 340, "w": 200, "h": 110, "boundary": "workload-telemetry"},
+        {"component": "oncall-team", "x": 1260, "y": 340, "w": 190, "h": 100, "boundary": "operations-plane"}
+      ],
+      "edges": ["rel-api-monitor", "rel-worker-monitor", "rel-bus-monitor", "rel-db-monitor", "rel-monitor-oncall"],
+      "legend": {"mode": "auto", "x": 1120, "y": 700},
+      "requirements": ["req-availability", "req-latency", "req-security", "req-data", "req-operations", "req-cost"],
+      "decisions": ["dec-observability-slo"]
+    },
+    {
+      "id": "resilience-recovery",
+      "title": "10 · Resilience, degradation, and recovery",
+      "type": "resilience",
+      "purpose": "Review failure isolation, durable handoff, dead-letter ownership, backup protection, restore, and the single-region tradeoff.",
+      "width": 1750,
+      "height": 950,
+      "boundaries": [
+        {"id": "zonal-runtime", "label": "East US 2 · zonal production runtime", "kind": "failure-domain", "x": 120, "y": 130, "w": 1050, "h": 650},
+        {"id": "recovery-boundary", "label": "Protected recovery and operations boundary", "kind": "failure-domain", "x": 1220, "y": 130, "w": 430, "h": 650}
+      ],
+      "nodes": [
+        {"component": "api-management", "x": 180, "y": 250, "w": 190, "h": 100, "boundary": "zonal-runtime"},
+        {"component": "order-api", "x": 480, "y": 250, "w": 180, "h": 100, "boundary": "zonal-runtime"},
+        {"component": "order-db", "x": 820, "y": 220, "w": 180, "h": 105, "boundary": "zonal-runtime"},
+        {"component": "outbox-worker", "x": 480, "y": 500, "w": 180, "h": 100, "boundary": "zonal-runtime"},
+        {"component": "service-bus", "x": 820, "y": 500, "w": 180, "h": 100, "boundary": "zonal-runtime"},
+        {"component": "service-bus-dlq", "x": 1240, "y": 250, "w": 190, "h": 100, "boundary": "recovery-boundary"},
+        {"component": "recovery-vault", "x": 1430, "y": 520, "w": 190, "h": 105, "boundary": "recovery-boundary"},
+        {"component": "azure-monitor", "x": 1240, "y": 650, "w": 190, "h": 100, "boundary": "recovery-boundary"}
+      ],
+      "edges": ["rel-apim-api", "rel-api-db", "rel-worker-db", "rel-worker-bus", "rel-bus-dlq", "rel-db-backup", "rel-backup-db", "rel-api-monitor", "rel-worker-monitor", "rel-bus-monitor", "rel-db-monitor"],
+      "legend": {"mode": "auto", "x": 120, "y": 800},
+      "requirements": ["req-availability", "req-recovery", "req-order-submit", "req-operations", "req-data"],
+      "decisions": ["dec-single-region-zonal", "dec-transactional-outbox"]
+    },
+    {
+      "id": "ui-customer-order-flow",
+      "title": "Customer order submission user flow",
+      "type": "user-flow",
+      "purpose": "Review the customer goal, screen actions, observable outcomes, and retry-safe exception path.",
+      "width": 1500,
+      "height": 900,
+      "nodes": [],
+      "flow": "ui-flow-submit-order",
+      "legend": {"mode": "auto", "x": 1180, "y": 720},
+      "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"],
+      "decisions": []
+    },
+    {
+      "id": "ui-order-entry-compact-view",
+      "title": "Order entry · compact responsive wireframe",
+      "type": "ui-wireframe",
+      "purpose": "Review compact information hierarchy, component reuse, actions, bindings, and the default state.",
+      "width": 1600,
+      "height": 950,
+      "nodes": [],
+      "screen": "ui-screen-order-entry",
+      "breakpoint": "ui-compact",
+      "state": "ui-state-default",
+      "legend": {"mode": "auto", "x": 1260, "y": 750},
+      "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"],
+      "decisions": []
+    },
+    {
+      "id": "ui-order-entry-wide-view",
+      "title": "Order entry · wide responsive wireframe",
+      "type": "ui-wireframe",
+      "purpose": "Review wide-screen region placement, data binding, action priority, and accessible state behavior.",
+      "width": 1800,
+      "height": 1000,
+      "nodes": [],
+      "screen": "ui-screen-order-entry",
+      "breakpoint": "ui-wide",
+      "state": "ui-state-default",
+      "legend": {"mode": "auto", "x": 1460, "y": 800},
+      "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"],
+      "decisions": []
+    },
+    {
+      "id": "ui-order-entry-state-map",
+      "title": "Order entry screen-state contract",
+      "type": "ui-state-map",
+      "purpose": "Review triggers, content, available actions, focus targets, and announcements for all critical states.",
+      "width": 1600,
+      "height": 1050,
+      "nodes": [],
+      "screen": "ui-screen-order-entry",
+      "legend": {"mode": "auto", "x": 1280, "y": 860},
+      "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"],
+      "decisions": []
+    }
+  ],
+  "ui_spec": {
+    "status": "in-review",
+    "platforms": ["web"],
+    "design_system": {
+      "name": "Fluent 2 reference profile",
+      "source": "Proposed Azure-aligned default; replace with the repository design system when one exists",
+      "reuse_policy": "Use existing product components first, then Fluent-compatible primitives; create a new component only for an unserved semantic contract.",
+      "tokens": {
+        "color.text.primary": "#101828",
+        "color.text.secondary": "#475467",
+        "color.surface.default": "#FFFFFF",
+        "color.surface.subtle": "#F9FAFB",
+        "color.action.primary": "#175CD3",
+        "color.status.danger": "#B42318",
+        "type.body.size": "16px",
+        "type.heading.weight": 700,
+        "space.control.gap": "12px",
+        "space.layout.gutter": "24px",
+        "radius.control": "8px",
+        "focus.ring": "2px solid #2E90FA"
+      }
+    },
+    "personas": [
+      {
+        "id": "ui-persona-retail-customer",
+        "name": "Authenticated retail customer",
+        "goals": ["Review the order", "Submit it once", "Recover safely from a transient failure"],
+        "roles": ["customer"],
+        "access_needs": ["Keyboard-only operation", "Screen-reader announcements", "200% zoom and 320 CSS-pixel reflow", "Clear error recovery without relying on color"]
+      }
+    ],
+    "breakpoints": [
+      {"id": "ui-compact", "label": "Compact phone and narrow window", "min_width": 0, "max_width": 767, "columns": 4, "gutter": 16},
+      {"id": "ui-wide", "label": "Tablet landscape and desktop", "min_width": 768, "max_width": null, "columns": 12, "gutter": 24}
+    ],
+    "flows": [
+      {
+        "id": "ui-flow-submit-order",
+        "name": "Review and submit an order",
+        "actor": "ui-persona-retail-customer",
+        "goal": "Submit one valid order and receive a durable confirmation without duplicate creation.",
+        "entry_screens": ["ui-screen-order-entry"],
+        "preconditions": ["Customer has an authenticated session", "Cart has at least one available item", "A stable checkout idempotency key exists"],
+        "steps": [
+          {"id": "ui-step-review-order", "screen": "ui-screen-order-entry", "action": "reviews items, quantities, totals, and delivery information", "outcome": "The complete order summary and editable fields are available in logical reading order.", "alternate": "Unavailable items are identified inline and submission remains disabled until resolved."},
+          {"id": "ui-step-submit-order", "screen": "ui-screen-order-entry", "action": "activates Submit order once", "outcome": "The action is disabled, the same idempotency key is sent, progress is announced, and duplicate activation is prevented.", "alternate": "A network or service error preserves entered data and offers a retry with the same key."},
+          {"id": "ui-step-confirm-order", "screen": "ui-screen-order-entry", "action": "reviews the confirmed order ID", "outcome": "A durable confirmation, next step, and navigation to orders are available and announced."}
+        ],
+        "outcomes": ["Exactly one order is created", "The customer receives an order ID", "Submission status is understandable without motion or color alone"],
+        "exceptions": ["Validation error", "Permission or session failure", "Offline or timeout", "Backend rejection with retry-safe correlation ID"],
+        "requirements": ["req-order-submit", "req-ui-order-experience", "req-latency", "req-security"]
+      }
+    ],
+    "screens": [
+      {
+        "id": "ui-screen-order-entry",
+        "name": "Review and submit order",
+        "route": "/checkout/review",
+        "purpose": "Let an authenticated customer verify the order, correct issues, submit once, and recover without losing work.",
+        "roles": ["customer"],
+        "data_classification": "confidential",
+        "requirements": ["req-order-submit", "req-ui-order-experience", "req-latency", "req-security", "req-data"],
+        "flows": ["ui-flow-submit-order"],
+        "states": [
+          {"id": "ui-state-default", "name": "Ready to review", "kind": "default", "trigger": "Order data and authorization are available", "content": "Review order details and submit when the summary is correct.", "available_actions": ["ui-action-submit-order", "ui-action-orders"], "focus_target": "Page heading on initial navigation; preserve current focus after inline edits", "announcement": "Order review loaded"},
+          {"id": "ui-state-loading", "name": "Loading order", "kind": "loading", "trigger": "Order query is pending with no usable cached result", "content": "Loading the order summary; controls are not exposed until labels and values are available.", "available_actions": [], "focus_target": "Keep focus on the initiating navigation target", "announcement": "Loading order review"},
+          {"id": "ui-state-empty", "name": "Empty cart", "kind": "empty", "trigger": "The order contains no purchasable items", "content": "Your cart is empty. Add an item before checkout.", "available_actions": ["ui-action-orders"], "focus_target": "Empty-state heading", "announcement": "Cart is empty"},
+          {"id": "ui-state-error", "name": "Submission failed safely", "kind": "error", "trigger": "Validation, timeout, or service failure prevents confirmed submission", "content": "The order was not confirmed. Your information is preserved; retry uses the same checkout key.", "available_actions": ["ui-action-retry-order", "ui-action-orders"], "focus_target": "Error summary linked to affected fields", "announcement": "Order was not submitted; review the error and retry"},
+          {"id": "ui-state-success", "name": "Order confirmed", "kind": "success", "trigger": "The API returns the durable order ID", "content": "Order confirmed. The order ID and next fulfillment step are available.", "available_actions": ["ui-action-orders"], "focus_target": "Confirmation heading", "announcement": "Order confirmed"},
+          {"id": "ui-state-permission", "name": "Permission denied", "kind": "permission-denied", "trigger": "The session is missing, expired, or lacks the customer role", "content": "Sign in again to review this order. No order details are disclosed.", "available_actions": [], "focus_target": "Permission heading", "announcement": "You are not authorized to review this order"},
+          {"id": "ui-state-offline", "name": "Offline", "kind": "offline", "trigger": "Connectivity is unavailable before confirmation", "content": "You appear to be offline. Your entered information remains local to this checkout session.", "available_actions": ["ui-action-retry-order"], "focus_target": "Offline status message", "announcement": "Offline; order has not been submitted"}
+        ],
+        "regions": [
+          {
+            "id": "ui-region-header",
+            "name": "Checkout header",
+            "component": "ui-component-page-header",
+            "role": "banner",
+            "description": "Page title, checkout step, and a safe route to the customer order list.",
+            "order": 1,
+            "visible_when": "Always after route authorization",
+            "actions": [{"id": "ui-action-orders", "label": "View orders", "kind": "navigation", "permission": "customer", "keyboard": "Native link; Enter activates", "target_route": "/account/orders"}],
+            "bindings": []
+          },
+          {
+            "id": "ui-region-summary",
+            "name": "Order summary",
+            "component": "ui-component-order-summary",
+            "role": "complementary",
+            "description": "Items, quantities, price breakdown, fulfillment method, and masked customer context.",
+            "order": 2,
+            "visible_when": "Default, error, and success states when authorized data is available",
+            "actions": [],
+            "bindings": ["ui-binding-submit-order"]
+          },
+          {
+            "id": "ui-region-form",
+            "name": "Order review form",
+            "component": "ui-component-order-form",
+            "role": "main",
+            "description": "Editable delivery details, validation summary, terms acknowledgement, and the primary submit action.",
+            "order": 3,
+            "visible_when": "Default and error states for an authorized customer",
+            "actions": [{"id": "ui-action-submit-order", "label": "Submit order", "kind": "primary", "permission": "customer with valid order", "keyboard": "Native button; Space or Enter activates once", "binding": "ui-binding-submit-order"}],
+            "bindings": ["ui-binding-submit-order"]
+          },
+          {
+            "id": "ui-region-status",
+            "name": "Submission status",
+            "component": "ui-component-status-panel",
+            "role": "status",
+            "description": "Loading, error, offline, or confirmation content with owned recovery actions and live announcements.",
+            "order": 4,
+            "visible_when": "Non-default state or validation summary is present",
+            "actions": [{"id": "ui-action-retry-order", "label": "Retry submission", "kind": "secondary", "permission": "customer with retained idempotency key", "keyboard": "Native button; Space or Enter activates", "binding": "ui-binding-submit-order"}],
+            "bindings": ["ui-binding-submit-order"]
+          }
+        ],
+        "layouts": [
+          {
+            "breakpoint": "ui-compact",
+            "width": 390,
+            "height": 844,
+            "placements": [
+              {"region": "ui-region-header", "x": 0, "y": 0, "w": 390, "h": 64},
+              {"region": "ui-region-summary", "x": 16, "y": 80, "w": 358, "h": 120},
+              {"region": "ui-region-form", "x": 16, "y": 216, "w": 358, "h": 420},
+              {"region": "ui-region-status", "x": 16, "y": 652, "w": 358, "h": 150}
+            ]
+          },
+          {
+            "breakpoint": "ui-wide",
+            "width": 1280,
+            "height": 800,
+            "placements": [
+              {"region": "ui-region-header", "x": 0, "y": 0, "w": 1280, "h": 64},
+              {"region": "ui-region-summary", "x": 32, "y": 88, "w": 360, "h": 640},
+              {"region": "ui-region-form", "x": 416, "y": 88, "w": 832, "h": 480},
+              {"region": "ui-region-status", "x": 416, "y": 592, "w": 832, "h": 136}
+            ]
+          }
+        ],
+        "evidence": [{"source": "proposal", "confidence": "high", "note": "Reference screen contract demonstrating UI specification support."}]
+      }
+    ],
+    "components": [
+      {"id": "ui-component-page-header", "name": "Checkout page header", "category": "navigation", "description": "Semantic banner with page title, progress context, and route actions.", "variants": ["compact", "wide"], "states": ["default"], "props": ["title", "stepLabel", "ordersHref"], "events": ["ordersNavigate"], "accessibility": "Uses banner landmark, one h1, descriptive link name, and logical focus order.", "implementation": "Reuse the product page-header primitive; do not create a checkout-only navigation system.", "requirements": ["req-ui-order-experience", "req-security"]},
+      {"id": "ui-component-order-summary", "name": "Order summary", "category": "data display", "description": "Responsive summary of items, price, fulfillment, and masked customer details.", "variants": ["compact", "wide", "confirmation"], "states": ["loading", "ready", "empty"], "props": ["items", "totals", "fulfillment", "maskedCustomer"], "events": [], "accessibility": "Uses headings and lists or table semantics appropriate to content; totals do not rely on visual position alone.", "implementation": "Pure presentation component with typed props and component-level accessibility tests.", "requirements": ["req-order-submit", "req-ui-order-experience", "req-data"]},
+      {"id": "ui-component-order-form", "name": "Order review form", "category": "form", "description": "Validated delivery fields, error summary, terms control, and retry-safe submit action.", "variants": ["compact", "wide"], "states": ["ready", "invalid", "submitting", "disabled"], "props": ["defaultValues", "validationSchema", "submitState", "idempotencyKey"], "events": ["fieldChanged", "submitRequested"], "accessibility": "Native labels and controls, programmatic error association, error summary links, described requirements, and no focus loss during validation.", "implementation": "Use repository-native schema validation and form primitives; keep idempotency key outside editable controls.", "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"]},
+      {"id": "ui-component-status-panel", "name": "Order status panel", "category": "feedback", "description": "Contextual progress, error, offline, permission, and confirmation message with recovery actions.", "variants": ["info", "error", "warning", "success"], "states": ["loading", "error", "offline", "permission-denied", "success"], "props": ["heading", "message", "correlationId", "actions", "liveMode"], "events": ["retryRequested", "ordersNavigate"], "accessibility": "Uses status or alert semantics intentionally, avoids duplicate announcements, moves focus only when task context changes, and never relies on color alone.", "implementation": "Reuse the product message-bar/status primitive with an owned live-region policy.", "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"]}
+    ],
+    "bindings": [
+      {
+        "id": "ui-binding-submit-order",
+        "screen": "ui-screen-order-entry",
+        "region": "ui-region-form",
+        "architecture_component": "front-door",
+        "relationship": "rel-web-frontdoor",
+        "operation": "Create order using the approved order API contract",
+        "transport": "HTTPS/443 with OIDC access token and Idempotency-Key",
+        "request": "Validated order draft, delivery selection, terms acknowledgement, correlation ID, and stable idempotency key; no secrets or analytics payload.",
+        "response": "Confirmed order ID and status, or a typed validation/auth/transient/permanent error with safe customer message and correlation ID.",
+        "authorization": "Customer role and resource ownership validated at the API; the UI check is convenience, not the security boundary.",
+        "loading": "Disable repeat submit, preserve all data, expose busy state, and announce progress without animation.",
+        "error": "Map typed errors to field summary or status panel; retain the same idempotency key for safe retry; never imply success without an order ID.",
+        "requirements": ["req-order-submit", "req-ui-order-experience", "req-latency", "req-security", "req-data"]
+      }
+    ],
+    "navigation": [
+      {"id": "ui-navigation-order-entry", "from": "ui-screen-order-entry", "to": "ui-screen-order-entry", "trigger": "Open a saved checkout deep link or return from the order list", "condition": "Checkout exists and is still editable", "guard": "Require customer role; prompt before abandoning dirty unsaved edits", "back_behavior": "Browser Back returns to the prior safe route without resubmitting; refresh rehydrates by checkout ID and retains the idempotency key", "requirements": ["req-order-submit", "req-ui-order-experience", "req-security"]}
+    ],
+    "accessibility": {
+      "target": "WCAG 2.2 Level AA",
+      "keyboard": "All controls use native keyboard behavior; reading and focus order follows region order; no keyboard trap; retry and error-summary links are reachable.",
+      "focus": "Set focus to the page heading on navigation, error summary on blocking validation, and confirmation heading after durable success; restore focus to the triggering action when a transient panel closes.",
+      "screen_reader": "Use semantic landmarks/headings/forms, programmatic labels and errors, page titles, status announcements, and non-color state names; avoid duplicate live-region messages.",
+      "contrast": "Semantic tokens must pass text and non-text contrast in default, hover, focus, disabled, error, and high-contrast states.",
+      "zoom_reflow": "At 200% zoom and 320 CSS pixels, regions reflow to the compact layout without horizontal page scrolling or loss of content/actions.",
+      "reduced_motion": "No animation or auto-advancing content is permitted; state changes are immediate, labeled, and announced when appropriate.",
+      "testing": ["Automated axe-core checks in component and E2E CI", "Manual keyboard-only journey at compact and wide breakpoints", "Manual screen reader journey with NVDA and VoiceOver", "Contrast, high-contrast, 200% zoom, 320 CSS-pixel reflow, and text-spacing checks"]
+    },
+    "implementation": {
+      "front_end": "Reuse the existing web application stack; for this standalone reference use React plus TypeScript as a proposed example, not a repository fact.",
+      "design_system_package": "Use the repository package when present; otherwise adopt Fluent UI React v9 behind product-owned wrapper components.",
+      "state_management": "Keep ephemeral form state local; represent server state with typed query keys and an explicit submission state machine.",
+      "data_fetching": "Typed API client with OIDC token injection, correlation ID, bounded timeout, cancellation, and no automatic unsafe POST retry.",
+      "validation": "Shared schema contract for client guidance plus authoritative server validation; map typed errors to fields and the error summary.",
+      "testing": "Unit tests for state reducers and mapping, component tests for semantics/states, contract tests for API types, E2E success/error/offline/permission journeys, accessibility checks, and visual regression at both breakpoints.",
+      "feature_flags": "Release behind an owned checkout-review flag with explicit default, audience, expiry, kill switch, and telemetry.",
+      "observability": "Capture Web Vitals, route and submit latency, typed failure class, retry and abandonment counts, and correlation ID; redact order/customer content and tokens."
+    },
+    "analytics": [
+      {"id": "ui-analytics-order-submit", "event": "checkout_order_submit_result", "screen": "ui-screen-order-entry", "trigger": "After a durable success or typed terminal failure", "properties": ["result_class", "latency_bucket", "retry_count", "breakpoint", "feature_flag_variant"], "privacy": "No order ID, customer ID, item data, free text, token, address, or correlation ID is emitted; follow consent and bounded retention policy."}
+    ]
+  },
+  "decisions": [
+    {"id": "dec-azure-aks", "title": "Use the existing enterprise AKS platform", "status": "proposed", "context": "The organization already operates an AKS application platform and adjacent retail services share its policy, GitOps, and support model.", "choice": "Deploy the order API and outbox worker into a private AKS cluster under an owned production namespace.", "rationale": "Reuses established platform capability and avoids a second operating model for the same team.", "alternatives": ["Azure Container Apps", "Azure App Service", "Azure Functions"], "consequences": ["Platform team remains accountable for cluster lifecycle.", "Application team must meet the restricted workload baseline.", "A simpler managed runtime should be reconsidered if platform reuse is no longer true."], "owner": "Architecture Review Board", "date": "2026-09-02", "affected": ["order-api", "outbox-worker", "aks-runtime"]},
+    {"id": "dec-transactional-outbox", "title": "Use a transactional outbox for event publication", "status": "proposed", "context": "Order acceptance and event publication must not diverge, and distributed transactions are not supported across PostgreSQL and Service Bus.", "choice": "Commit the order and outbox row in one transaction, then publish asynchronously with a stable event ID.", "rationale": "Avoids dual-write loss while preserving durable retry and independent fulfillment processing.", "alternatives": ["Synchronous fulfillment call", "Direct database-to-broker dual write", "Change data capture"], "consequences": ["The worker and outbox backlog require operational ownership.", "Consumers must be idempotent.", "Event publication is eventually consistent after order acceptance."], "owner": "Retail Ordering Team", "date": "2026-09-02", "affected": ["order-api", "order-db", "outbox-worker", "service-bus", "rel-api-db", "rel-worker-bus"]},
+    {"id": "dec-service-bus", "title": "Use Service Bus Premium for the order event", "status": "proposed", "context": "The integration needs durable delivery, bounded redelivery, dead-lettering, private connectivity, and enterprise ownership.", "choice": "Publish OrderCreated v2 to a Service Bus Premium topic with an owned fulfillment subscription and DLQ.", "rationale": "Meets the enterprise integration requirement without operating a broker on AKS.", "alternatives": ["Event Grid", "Event Hubs", "Kafka on a managed platform", "Synchronous API"], "consequences": ["Throughput and messaging-unit capacity must be load tested.", "Replay and DLQ runbooks are required.", "Event contract versioning is part of the implementation."], "owner": "Integration Platform Team", "date": "2026-09-02", "affected": ["service-bus", "service-bus-dlq", "rel-worker-bus", "rel-bus-fulfillment"]},
+    {"id": "dec-private-data-plane", "title": "Keep confidential PaaS services private", "status": "proposed", "context": "Order data is confidential and public data-plane exposure is unnecessary.", "choice": "Use private endpoints, Private DNS, and controlled egress for PostgreSQL, Service Bus, Key Vault, and ACR.", "rationale": "Reduces exposure and aligns with the application landing-zone network model.", "alternatives": ["Public endpoints with IP allowlists", "Service endpoints where supported"], "consequences": ["DNS and network dependencies become production-critical.", "Platform team owns endpoint, route, and firewall lifecycle.", "Troubleshooting requires cross-team telemetry."], "owner": "Security Architecture", "date": "2026-09-02", "affected": ["order-db", "service-bus", "key-vault", "container-registry", "azure-deployment-network", "security-trust"]},
+    {"id": "dec-workload-identity", "title": "Use federated workload identity", "status": "proposed", "context": "Long-lived credentials in workload configuration create rotation and compromise risk.", "choice": "Use Entra Workload ID and managed identities for Azure resource access.", "rationale": "Provides short-lived tokens, per-workload scope, and auditable access without stored cloud credentials.", "alternatives": ["Kubernetes secrets containing client secrets", "Shared managed identity"], "consequences": ["Federated credentials and service accounts must be managed as code.", "Each workload needs explicit least-privilege role assignments."], "owner": "Security Architecture", "date": "2026-09-02", "affected": ["order-api", "outbox-worker", "entra-id", "key-vault", "ctl-workload-identity"]},
+    {"id": "dec-single-region-zonal", "title": "Use one region with zonal high availability for initial production", "status": "proposed", "context": "The assumed 99.9% SLO and 60-minute RTO do not currently justify active multi-region complexity.", "choice": "Use zone-aware AKS, API Management capacity, PostgreSQL HA, and Service Bus Premium in East US 2 with tested restore.", "rationale": "Meets the assumed objectives with lower operational and data-consistency complexity.", "alternatives": ["Active-passive second region", "Active-active multi-region"], "consequences": ["A regional outage can exceed the monthly SLO and requires restore or redeployment.", "Business must confirm the SLO and RTO assumption before approval.", "A second region should be added if objectives tighten."], "owner": "Architecture Review Board", "date": "2026-09-02", "affected": ["order-db", "service-bus", "order-api", "resilience-recovery", "risk-region-outage"]},
+    {"id": "dec-gitops-supply-chain", "title": "Promote signed digests through GitOps", "status": "proposed", "context": "Production deployment needs immutable artifacts, peer-reviewed desired state, provenance, and deterministic rollback.", "choice": "Build once, scan and sign the image, promote its digest through protected environment repositories, and let Flux reconcile it.", "rationale": "Separates artifact production from environment approval and provides an auditable desired state.", "alternatives": ["Pipeline directly applies manifests", "Mutable environment tags"], "consequences": ["Signing and admission availability are deployment dependencies.", "Emergency change has a documented and audited Git path.", "Rollback is a Git revision and prior signed digest."], "owner": "DevSecOps Team", "date": "2026-09-02", "affected": ["git-repository", "build-pipeline", "container-registry", "flux-gitops", "delivery-gitops"]},
+    {"id": "dec-observability-slo", "title": "Measure SLOs at the customer edge and correlate dependencies", "status": "proposed", "context": "Platform health alone does not show whether customers can place orders.", "choice": "Calculate availability and latency SLIs at Front Door and correlate them with APIM, AKS, PostgreSQL, Service Bus, and business-event telemetry.", "rationale": "Connects alerts and error budgets to the user outcome while retaining dependency diagnosis.", "alternatives": ["Infrastructure-only monitoring", "Application logs without distributed correlation"], "consequences": ["Telemetry requires redaction and bounded retention.", "SRE and product owners share SLO governance.", "Exporter failure must not block order processing."], "owner": "SRE Team", "date": "2026-09-02", "affected": ["azure-monitor", "observability-operations", "ctl-observability"]}
+  ],
+  "risks": [
+    {"id": "risk-public-abuse", "title": "Automated abuse or volumetric traffic reaches the order API", "category": "security", "likelihood": "medium", "impact": "high", "exposure": "high", "mitigation": "Front Door Premium WAF, bot and rate rules, DDoS decision, authentication, origin restriction, load shedding, and alerting.", "owner": "Security Architecture", "status": "mitigating", "affected": ["front-door", "api-management", "ctl-edge-protection"]},
+    {"id": "risk-credential-misuse", "title": "A shared or long-lived credential grants excessive Azure access", "category": "identity", "likelihood": "medium", "impact": "high", "exposure": "high", "mitigation": "Workload identity, per-service accounts, least-privilege roles, Key Vault, PIM, rotation, and access review.", "owner": "Security Architecture", "status": "mitigating", "affected": ["order-api", "outbox-worker", "key-vault", "ctl-workload-identity"]},
+    {"id": "risk-data-exposure", "title": "Confidential order data is exposed through a public or over-permissive data path", "category": "data protection", "likelihood": "low", "impact": "critical", "exposure": "high", "mitigation": "Private endpoints, Private DNS, encryption, scoped identities, audited access, classification, retention, and policy controls.", "owner": "Data Governance", "status": "mitigating", "affected": ["order-db", "service-bus", "recovery-vault", "ctl-private-data"]},
+    {"id": "risk-event-loss", "title": "An accepted order is never published for fulfillment", "category": "reliability", "likelihood": "medium", "impact": "critical", "exposure": "high", "mitigation": "Atomic outbox, backlog-age alert, durable retry, reconciliation, and owned recovery runbook.", "owner": "Retail Ordering Team", "status": "mitigating", "affected": ["order-db", "outbox-worker", "service-bus", "ctl-atomic-outbox"]},
+    {"id": "risk-duplicate-event", "title": "A retried event causes duplicate fulfillment action", "category": "reliability", "likelihood": "medium", "impact": "high", "exposure": "high", "mitigation": "Stable event ID, idempotent consumer record, bounded redelivery, and audited replay.", "owner": "Fulfillment Team", "status": "mitigating", "affected": ["service-bus", "fulfillment-system", "rel-bus-fulfillment"]},
+    {"id": "risk-undetected-failure", "title": "Order-path degradation is not detected before material customer impact", "category": "operations", "likelihood": "medium", "impact": "high", "exposure": "high", "mitigation": "Edge SLIs, dependency and business telemetry, error-budget alerts, synthetic checks, owned runbooks, and game days.", "owner": "SRE Team", "status": "mitigating", "affected": ["azure-monitor", "oncall-team", "ctl-observability"]},
+    {"id": "risk-cluster-misconfiguration", "title": "An AKS workload bypasses isolation or production safety defaults", "category": "kubernetes security", "likelihood": "medium", "impact": "high", "exposure": "high", "mitigation": "Restricted PSS, admission policy, default-deny network policy, non-root baseline, quotas, GitOps, and policy evidence.", "owner": "Azure Platform Team", "status": "mitigating", "affected": ["order-api", "outbox-worker", "ctl-k8s-baseline"]},
+    {"id": "risk-supply-chain", "title": "A vulnerable or untrusted artifact reaches production", "category": "supply chain", "likelihood": "medium", "impact": "critical", "exposure": "high", "mitigation": "Protected source, scanning, SBOM, signed provenance, digest promotion, admission verification, and rollback.", "owner": "DevSecOps Team", "status": "mitigating", "affected": ["build-pipeline", "container-registry", "flux-gitops", "ctl-supply-chain"]},
+    {"id": "risk-region-outage", "title": "A regional outage exceeds the assumed availability objective", "category": "resilience", "likelihood": "low", "impact": "critical", "exposure": "high", "mitigation": "Zonal HA, tested restore and GitOps bootstrap, recovery runbook, business acceptance of the regional tradeoff, and a trigger for multi-region reassessment.", "owner": "Architecture Review Board", "status": "accepted", "affected": ["dec-single-region-zonal", "recovery-vault", "ctl-backup-restore"]}
+  ],
+  "assumptions": [
+    {"id": "asm-existing-aks-platform", "text": "A supported enterprise AKS platform and skilled operating team already exist.", "consequence": "If false, Container Apps or App Service should be reconsidered before implementation.", "owner": "Azure Platform Team", "revisit_by": "2026-10-01", "status": "active"},
+    {"id": "asm-slo-rto", "text": "99.9% monthly availability, 60-minute RTO, and 15-minute RPO are acceptable business objectives.", "consequence": "Tighter objectives can require multi-region application and data design.", "owner": "Retail Product Owner", "revisit_by": "2026-10-01", "status": "active"},
+    {"id": "asm-throughput", "text": "Service Bus Premium and the selected PostgreSQL tier can be sized after a production-like load test.", "consequence": "Final SKUs and cost cannot be approved until capacity evidence exists.", "owner": "Retail Ordering Team", "revisit_by": "2026-11-01", "status": "active"}
+  ],
+  "open_questions": [
+    {"id": "question-peak-load", "question": "What are the approved peak requests per second, event rate, and payload-size distributions?", "owner": "Retail Product Owner", "blocking": false, "due": "2026-10-15", "consequence": "Final APIM, PostgreSQL, Service Bus, and AKS capacity and cost remain provisional.", "status": "deferred"},
+    {"id": "question-partner-connectivity", "question": "Does the partner require public mTLS or private cross-tenant connectivity?", "owner": "Partner Integration Team", "blocking": false, "due": "2026-10-15", "consequence": "The partner ingress implementation may change while the API contract remains stable.", "status": "deferred"}
+  ],
+  "waivers": []
+}

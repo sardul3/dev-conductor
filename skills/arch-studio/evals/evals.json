@@ -1,0 +1,71 @@
+{
+  "skill_name": "arch-studio",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Integrate a new returns portal into our existing order platform on Azure. We need the cloud architecture and the portal UI, but I have not provided the repository, user roles, traffic, data classification, SLOs, routes, or API contracts.",
+      "expected_output": "The skill starts evidence-aware /grill discovery rather than inventing a diagram, and shapes both architecture and UI blocking questions.",
+      "expectations": [
+        "Invokes the existing /grill skill in focused rounds and does not generate final diagrams before blockers are resolved or accepted as explicit assumptions.",
+        "Requests or inspects repository/IaC/frontend/API evidence before asking questions that files can answer.",
+        "Covers Azure, security, data, reliability, delivery, roles, routes, design-system reuse, screen states, accessibility, responsive behavior, UI-to-API bindings, and acceptance testing.",
+        "Does not invent exact SLOs, owners, regions, API endpoints, roles, or design-system facts."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add a responsive order-review UI specification to this React repository. It already has a private component library, tokens, route guards, TanStack Query, Zod, and Playwright. The backend architecture is already modeled.",
+      "expected_output": "The skill derives a repository-native UI contract and connects it to the existing architecture rather than replacing established patterns.",
+      "expectations": [
+        "Inspects and reuses the repository component library, tokens, routing, query, validation, and test patterns instead of defaulting to Fluent 2.",
+        "Adds ui_spec screens, components, flows, breakpoints, states, bindings, navigation, accessibility, implementation, and analytics/privacy to the canonical model.",
+        "Links data-bound regions to real architecture components and relationships and marks any proposed API contract as proposed evidence.",
+        "Generates user-flow, compact/wide wireframe, state-map, UI specification, component matrix, acceptance plan, tokens, and interactive review artifacts."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Design the technical UI spec for an enterprise admin page that can revoke access for hundreds of users in bulk. It must be safe and pass accessibility/security review.",
+      "expected_output": "The skill produces an implementation-ready privileged workflow with explicit safety, authorization, recovery, and accessibility contracts.",
+      "expectations": [
+        "Uses /grill to resolve operator roles, approval/segregation-of-duties, blast radius, audit, rollback, partial failure, and notification requirements.",
+        "Specifies selection, review, confirmation, progress, partial-success, error, permission-denied, cancellation, and recovery states.",
+        "Every destructive action has explicit authorization and confirmation or undo/recovery behavior; the backend remains the authorization boundary.",
+        "Includes keyboard, focus, screen-reader announcement, high-contrast, zoom/reflow, and test ownership requirements."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Give me a draw.io-compatible UI diagram for a customer checkout on phone and desktop, including loading, empty, error, offline, and success states. No animations.",
+      "expected_output": "The skill creates static draw.io and HTML-review UI diagrams driven from one responsive state contract.",
+      "expectations": [
+        "Creates at least compact and wide breakpoint layouts with non-overlapping placements and stable region IDs.",
+        "Creates ui-wireframe pages for both breakpoints and a ui-state-map page with labels and legends.",
+        "Defines state content, actions, focus targets, announcements, retry/idempotency behavior, and UI-to-system bindings.",
+        "Generated HTML and UI contract contain no CSS/SVG/canvas/GIF animation or auto-advancing content."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "During visual review I rejected the checkout error state and requested an inline validation summary plus a retry-safe service-error panel. Apply the change without disturbing the approved architecture or other screens.",
+      "expected_output": "The skill applies the smallest coherent canonical-model revision, preserves stable IDs, and regenerates a traceable delta.",
+      "expectations": [
+        "Preserves unrelated architecture/UI IDs, contracts, and placements.",
+        "Updates the affected state, regions/components, binding error behavior, acceptance tests, and requirement traceability together.",
+        "Runs a strict build and semantic diff; geometry-only movement is separated from semantic change.",
+        "Does not weaken or delete a governance, Kubernetes, security, or UI-quality gate to force a pass."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Document the network and Kubernetes deployment architecture for a headless batch ingestion service. There is no user interface.",
+      "expected_output": "The skill creates the appropriate architecture pack without fabricating irrelevant UI scope.",
+      "expectations": [
+        "Selects network, deployment, Kubernetes, security, data-flow, delivery, observability, and resilience views according to evidence and decisions.",
+        "Does not require or invent personas, screens, design tokens, breakpoints, UI states, or UI artifacts when UI is explicitly out of scope.",
+        "Still uses /grill for unresolved architecture blockers and applies Azure/Kubernetes gates.",
+        "Produces static labeled draw.io pages with legends and the normal architecture review bundle."
+      ]
+    }
+  ]
+}

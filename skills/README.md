@@ -36,6 +36,14 @@ Source of truth is this directory. Plugin and Cursor install from here (`plugins
 
 `prompt-contract`, `design-tree-interview`, `grill-plan`, `grill-plan-docs`, `session-handoff`, `domain-glossary`, `restate-plain`, `grill-deep-ask`
 
+## Architecture / UI spec (optional)
+
+Not part of `/dev-loop`. Cursor install still copies it with the other skills.
+
+| Skill | Use |
+| ----- | --- |
+| `arch-studio` | Canonical `.arch.json` → draw.io, `review.html`, Azure/K8s gates, UI spec. Discovery uses `design-tree-interview`. |
+
 ## Agents
 
 `claude/agents/` → `~/.claude/agents/` via `./claude/install-agents.sh`. Keep the set small: **code-reviewer**, **debugger**, **code-simplifier**. Descriptions are always-on in the Task picker.
