@@ -6,13 +6,17 @@ https://github.com/sardul3/dev-conductor
 
 ## Install
 
+**Cursor (Agent `/dev-loop`, stepper CLI):** follow **[cursor/README.md](cursor/README.md)** (`./cursor/dev-loop/install.sh`).
+
+**Claude Code + Cursor together:**
+
 ```bash
 git clone https://github.com/sardul3/dev-conductor.git
 cd dev-conductor
 ./install.sh
 ```
 
-Installs the CLI to `~/.claude/hooks/dev-loop/`, the `/dev-loop` slash command, loop skills and agents, prompt-enrich (spec grill), and the Cursor port (`~/.cursor/skills`, `~/.agents/skills`).
+Installs the CLI to `~/.claude/hooks/dev-loop/`, `/dev-loop` for Claude Code, loop skills and agents, prompt-enrich, and the Cursor port (`~/.cursor/skills`, `~/.local/bin/dev-loop`). How to send a PR: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Optional path-scoped stack rules (Java, Python/ML, LLM, TypeScript, k8s, …) live in `.envfiles/rules/` and are **not** always-on:
 
@@ -29,7 +33,7 @@ claude plugin marketplace add /path/to/dev-conductor
 ```bash
 /dev-loop PROJ-123
 # or
-python3 ~/.claude/hooks/dev-loop/cli.py start PROJ-123 --repo /path/to/repo
+dev-loop start PROJ-123 --repo /path/to/repo
 ```
 
 Config: `~/.config/dev-conductor/dev-loop/config.yaml`  
@@ -47,10 +51,12 @@ Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml ev
 | `plugins/dev-loop/` | Claude plugin (`skills` / `agents` / `commands` symlink to sources) |
 | `skills/` | Loop + grill skills |
 | `claude/agents/` | `code-reviewer`, `debugger`, `code-simplifier` |
-| `claude/commands/dev-loop.md` | `/dev-loop` |
+| `cursor/README.md` | Cursor install, `/dev-loop`, `dev-loop` CLI |
+| `cursor/dev-loop/` | Cursor `install.sh`, hooks, `dev-loop.mdc` |
+| `cursor/commands/dev-loop.md` | Cursor Agent `/dev-loop` |
+| `claude/commands/dev-loop.md` | Claude Code `/dev-loop` |
 | `claude/prompt-enrich/` | Spec grill + launch |
-| `cursor/dev-loop/` | Cursor `install.sh` + `dev-loop.mdc` |
-| `install.sh` | One-shot install |
+| `install.sh` | One-shot Claude + Cursor install |
 | `.envfiles/` | Canonical `AGENTS.md` / `CLAUDE.md` plus path-scoped `rules/` |
 
 ## Tests

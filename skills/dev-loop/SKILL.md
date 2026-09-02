@@ -8,7 +8,8 @@ description: Run the Jira-to-PR conductor for a ticket. Use when the user says /
 The CLI owns fetch, verify, and ship. You own grilling, tests, implementation, and handshake files. Secrets: `ATLASSIAN_*` in `~/.config/dev-conductor/secrets.env`. Config: `~/.config/dev-conductor/dev-loop/config.yaml`.
 
 ```bash
-CLI="python3 ~/.claude/hooks/dev-loop/cli.py"
+CLI="dev-loop"   # ~/.local/bin/dev-loop → python3 ~/.claude/hooks/dev-loop/cli.py
+# alias: dl
 ```
 
 Never guess the repo. Never `continue --no-wait` (that runs every remaining stage with no agent). Never `finish-branch` — ship is `step` / `continue`. Never commit `main`/`master`.

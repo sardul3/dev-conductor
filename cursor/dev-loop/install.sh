@@ -31,7 +31,14 @@ cp "${ROOT}/dev-loop/config.yaml.example" "${CFG_DEST}/config.yaml.example"
 cp "${ROOT}/dev-loop/config.test.yaml" "${CFG_DEST}/config.test.yaml"
 if [[ ! -f "${CFG_DEST}/config.yaml" ]]; then
   cp "${ROOT}/dev-loop/config.yaml.example" "${CFG_DEST}/config.yaml"
-  echo "wrote ${CFG_DEST}/config.yaml — set jira.project and runtime.agent: cursor"
+  python3 - "${CFG_DEST}/config.yaml" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+p.write_text(text.replace("agent: claude", "agent: cursor", 1), encoding="utf-8")
+PY
+  echo "wrote ${CFG_DEST}/config.yaml with runtime.agent: cursor — set jira.project"
 fi
 
 shopt -s nullglob
@@ -59,7 +66,30 @@ SESSION_CMD="python3 ${CUR_HOOKS}/session_start_cursor.py"
 DENY_CMD="python3 ${CUR_HOOKS}/deny_read_cursor.py"
 python3 "${ROOT}/cursor/dev-loop/merge_hooks.py" "${HOME}/.cursor/hooks.json" "${SESSION_CMD}" "${DENY_CMD}"
 
+BIN="${HOME}/.local/bin"
+mkdir -p "${BIN}"
+cp "${ROOT}/dev-loop/bin/dev-loop" "${BIN}/dev-loop"
+chmod +x "${BIN}/dev-loop"
+
+CMD_DEST="${HOME}/.cursor/commands"
+mkdir -p "${CMD_DEST}"
+cp "${ROOT}/cursor/commands/dev-loop.md" "${CMD_DEST}/dev-loop.md"
+
+ZSHRC="${HOME}/.zshrc"
+touch "${ZSHRC}"
+if ! grep -q 'alias dl='\''dev-loop'\''' "${ZSHRC}"; then
+  printf '\n# dev-conductor\nalias dl='\''dev-loop'\''\n' >> "${ZSHRC}"
+  echo "appended alias dl=dev-loop to ${ZSHRC}"
+fi
+if ! grep -q '\.local/bin' "${ZSHRC}"; then
+  printf 'export PATH="$HOME/.local/bin:$PATH"\n' >> "${ZSHRC}"
+  echo "appended ~/.local/bin to PATH in ${ZSHRC}"
+fi
+
 echo "Cursor port installed."
-echo "  cli: python3 ${HOOK_DEST}/cli.py step KEY --repo PATH"
-echo "  set runtime.agent: cursor in ${CFG_DEST}/config.yaml"
-echo "  secrets: ~/.config/dev-conductor/secrets.env (ATLASSIAN_*)"
+echo "  Agent chat: /dev-loop KEY   (reload Cursor window if missing)"
+echo "  terminal:   dev-loop start KEY --repo ~/dev/YOUR-CLONE"
+echo "  alias:      dl"
+echo "  config:     ${CFG_DEST}/config.yaml  (runtime.agent: cursor)"
+echo "  secrets:    ~/.config/dev-conductor/secrets.env (ATLASSIAN_*)"
+echo "  guide:      cursor/README.md"

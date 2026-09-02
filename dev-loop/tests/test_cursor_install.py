@@ -19,6 +19,15 @@ class CursorInstallTests(unittest.TestCase):
         self.assertGreaterEqual(len(skills), 20)
         self.assertIn("prompt-contract", skills)
         self.assertIn("design-tree-interview", skills)
+        self.assertIn("${HOME}/.local/bin", text)
+        self.assertIn("dev-loop/bin/dev-loop", text)
+        self.assertIn("cursor/commands/dev-loop.md", text)
+        self.assertIn("alias dl=", text)
+        self.assertIn("agent: cursor", text)
+        cmd = (ROOT / "cursor" / "commands" / "dev-loop.md").read_text(encoding="utf-8")
+        self.assertIn("name: dev-loop", cmd)
+        wrapper = ROOT / "dev-loop" / "bin" / "dev-loop"
+        self.assertTrue(wrapper.is_file())
 
     def test_given_existing_hooks_when_merge_then_keeps_other_commands(self) -> None:
         sys.path.insert(0, str(ROOT / "cursor" / "dev-loop"))

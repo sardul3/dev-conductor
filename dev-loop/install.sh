@@ -72,7 +72,9 @@ python3 "${HOOK_DEST}/cli.py" install-poller || true
 echo
 echo "dev-loop installed."
 echo "  cli: python3 ${HOOK_DEST}/cli.py"
-echo "  slash: /dev-loop KEY"
+echo "  shortcut: ${HOME}/.local/bin/dev-loop  (alias: dl)"
+echo "  Cursor: /dev-loop KEY in Agent chat (see cursor/README.md)"
+echo "  Claude: /dev-loop KEY"
 echo "  poll: python3 ${HOOK_DEST}/cli.py poll"
 echo "  config: ${CFG_DEST}/config.yaml"
 echo "  secrets: ~/.config/dev-conductor/secrets.env (ATLASSIAN_*)"

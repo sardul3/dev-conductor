@@ -16,7 +16,6 @@ PY
 "${ROOT}/claude/install-agents.sh"
 echo
 echo "dev-conductor installed."
-echo "  /dev-loop KEY"
-echo "  python3 ~/.claude/hooks/dev-loop/cli.py step KEY   # Cursor"
-echo "  python3 ~/.claude/hooks/dev-loop/cli.py continue KEY  # Claude"
-echo "  config: ~/.config/dev-conductor/dev-loop/config.yaml"
+echo "  Cursor:  see cursor/README.md   then  /dev-loop KEY  or  dev-loop start KEY --repo PATH"
+echo "  Claude:  /dev-loop KEY"
+echo "  config:  ~/.config/dev-conductor/dev-loop/config.yaml"

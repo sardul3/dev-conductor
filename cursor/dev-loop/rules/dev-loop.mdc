@@ -6,8 +6,8 @@ alwaysApply: false
 Cursor agent is the conductor. CLI is a **stepper** — never a 24h wait.
 
 ```bash
-python3 ~/.claude/hooks/dev-loop/cli.py start KEY --repo PATH
-python3 ~/.claude/hooks/dev-loop/cli.py step KEY
+dev-loop start KEY --repo PATH
+dev-loop step KEY
 ```
 
 `continue` with `runtime.agent: cursor` is an alias of `step`. Do not use `continue --no-wait` (that runs every remaining stage with no agent).
@@ -16,7 +16,7 @@ Handshake under `~/.config/dev-conductor/dev-loop/runs/KEY/`:
 
 - `STAGE_DONE` / `SESSION_DONE` — this agent writes when the **stage** is done
 - `SPEC_APPROVED` / `APPROVED` — only after the user confirms the spec (AskQuestion). Not auto.
-- Then `cli.py step KEY` again
+- Then `dev-loop step KEY` again
 
 Test-writer: spawn a **new Agent** whose prompt is only `spec.md` + `contracts.md`. Do not Read `src/main` in the parent chat. `beforeReadFile` also denies impl reads while `state.stage` is `test-writer`.
 

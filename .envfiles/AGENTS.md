@@ -16,8 +16,8 @@ dev-conductor is the Jira-to-PR loop. Do not silently revert these:
 - Enrich tests: `python3 -m unittest discover -s claude/prompt-enrich/tests -v`
 - Eval: `python3 dev-loop/cli.py --config dev-loop/config.test.yaml eval --repo <lab-repo>`
 - Install (full): `./install.sh`
-- Install (Cursor-first): `./cursor/dev-loop/install.sh` then set `runtime.agent: cursor`
-- Cursor stepper: `python3 ~/.claude/hooks/dev-loop/cli.py step KEY`
+- Install (Cursor-first): `./cursor/dev-loop/install.sh` — see `cursor/README.md`
+- Cursor: `/dev-loop KEY` in Agent, or `dev-loop step KEY`
 
 ## Layout
 
