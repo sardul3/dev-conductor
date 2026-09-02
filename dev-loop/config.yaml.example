@@ -41,13 +41,15 @@ git:
   create_pr: true
   gh_bin: gh
   pr_title_pattern: '{type}: {summary} ({key})'
+  # PR body is generated (Jira browse link, inferred recipe commands, verify.log
+  # evidence). No spec excerpt. Not a yaml template.
   merge_to_default_after_ship: false
   check_conventional: true
   rewrite_unpushed: true
   stack_prs: false
   max_files_per_pr: 0
   merge_method: squash
-  # worktree = native `git worktree` under .{repo}-worktrees/{KEY} (default).
+  # worktree = native `git worktree` under {repo}-worktrees/{KEY} (default; visible).
   # treehouse = leased worktree via `treehouse get --lease`.
   # none = work in the clone you passed to start. Eval uses none.
   isolation: worktree
@@ -60,7 +62,7 @@ queue:
   max_active: 3
 
 runtime:
-  # claude = launch-clean-claude.sh; cursor = write prompts only (run in Cursor);
+  # claude = launch-clean-claude.sh then wait; cursor = one-stage `cli.py step` (never polls);
   # none = no terminals (eval / builtin adapters).
   agent: claude
   launch_script: ~/.claude/hooks/prompt-enrich/launch-clean-claude.sh
@@ -159,6 +161,9 @@ evidence:
   timeout_sec: 8
   playwright_cmd: ''
   probes: []
+  # Ship refuses without an image/video in runs/KEY/evidence/ (all tickets).
+  # Eval (config.test.yaml) sets this false. Agent captures; CLI cannot screenshot.
+  require_visual: true
   # probes:
   #   - method: GET
   #     url: http://127.0.0.1:8080/actuator/health
@@ -182,7 +187,8 @@ poller:
   bot_logins: []
 
 workflow:
-  enabled: false
+  # start/step/ship fire these. false only for eval (config.test.yaml).
+  enabled: true
   on_start: In Progress
   on_pr: In Review
   on_merge: Done
@@ -191,6 +197,12 @@ workflow:
   deploy_ticket_jql: ''
   deploy_ticket_key: ''
   comment_on_progress: true
+  # Assign the authenticated Atlassian user on start when unassigned (skip if someone else).
+  assign_on_start: true
+  # {number} {branch} {pr_url}/{url}. HTTPS URL is appended if the template omits it.
+  on_pr_comment: |
+    PR #{number} opened on {branch}
+    {pr_url}
 
 # supervised = grill spec then wait. unattended = auto-approve spec and run through PR with no operator.
 # Still launches agent sessions; they must finish on their own. merge: auto turns on poller.auto_merge.

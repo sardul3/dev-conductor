@@ -17,6 +17,7 @@ Source of truth is this directory. Plugin and Cursor install from here (`plugins
 | `dev-loop-review` | `verdict.json` via `code-reviewer` |
 | `pr-comment-fixer` | Address PR review comments |
 | `jira-progress` | Jira REST column moves + comments |
+| `agent-memory` | Durable conventions from `verdict.json` `metadata[]` |
 | `lavish-ui` | Spike: Lavish HTML review for UI/UX tickets only |
 
 ## Coding / ops (used by the loop)
@@ -27,7 +28,7 @@ Source of truth is this directory. Plugin and Cursor install from here (`plugins
 | `systematic-debugging` | Root cause before patch |
 | `verify-before-done` | Proof before “done” |
 | `code-review` | Spawn `code-reviewer` on the diff |
-| `finish-branch` | Tests then merge/PR options |
+| `finish-branch` | Ad-hoc merge/PR options — **not** `/dev-loop` ship |
 | `implement-terse` | Work-session tone |
 | `token-playbook` | Where context should live |
 

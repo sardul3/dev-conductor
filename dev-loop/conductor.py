@@ -13,17 +13,17 @@ from gitutil import current_branch, default_branch, denylisted, github_remote, i
 from jira_client import get_issue
 from memory import load_or_build
 from paths import run_dir
-from agent_memory import apply_from_verdict
+from agent_memory import apply_run_memory
 from prompts import review_prompt, simplify_prompt, spec_prompt, test_writer_prompt, writer_prompt
 from evidence import capture_evidence
-from jira_workflow import progress
-from ship import ensure_feature_branch, pr_body, ship_work
+from jira_workflow import pr_comment_text, progress
+from ship import ensure_feature_branch, pr_body, pr_body_inputs, ship_work
 from state import load_state, update_state
 from touched import changed_since, load_snapshot, save_snapshot, snapshot_tree
 from verify_infer import run_verify
 from watch import add_watch
 from progress import backfill, record
-from treehouse import prepare_workspace, release_lease, workspace_for_run
+from treehouse import prepare_workspace, release_lease, workspace_for_ticket, workspace_notice
 from budget import BudgetExhausted, check_and_charge, check_budget, counts_against_budget, remaining_session_usd, stop_run
 from lavish import decide_lavish
 
@@ -117,7 +117,7 @@ def launch_prompt(prompt: str, repo: Path, run: Path, name: str, cfg: DevLoopCon
 
 
 def wait_file(path: Path, cfg: DevLoopConfig) -> bool:
-    if cfg.runtime.builtin_adapters or cfg.runtime.agent == "none":
+    if cfg.runtime.builtin_adapters or cfg.runtime.agent in {"none", "cursor"}:
         return path.is_file()
     start = time.time()
     timeout = max(1, int(cfg.runtime.wait_timeout_sec))
@@ -130,7 +130,7 @@ def wait_file(path: Path, cfg: DevLoopConfig) -> bool:
 
 
 def wait_session_done(run: Path, cfg: DevLoopConfig) -> bool:
-    if cfg.runtime.builtin_adapters or cfg.runtime.agent == "none":
+    if cfg.runtime.builtin_adapters or cfg.runtime.agent in {"none", "cursor"}:
         return (run / "STAGE_DONE").is_file() or (run / "SESSION_DONE").is_file()
     start = time.time()
     timeout = max(1, int(cfg.runtime.wait_timeout_sec))
@@ -144,6 +144,17 @@ def wait_session_done(run: Path, cfg: DevLoopConfig) -> bool:
 
 def spec_is_approved(run: Path) -> bool:
     return (run / "APPROVED").is_file() or (run / "SPEC_APPROVED").is_file()
+
+
+def approve_spec(run: Path, key: str = "") -> None:
+    """Record the human spec gate. Does not write STAGE_DONE (that is later stages)."""
+    if not (run / "spec.md").is_file():
+        raise FileNotFoundError(f"dev-loop: write spec.md before approve — {run / 'spec.md'}")
+    ticket = key or run.name
+    (run / "SPEC_APPROVED").write_text("spec approved\n", encoding="utf-8")
+    if not (run / "APPROVED").is_file():
+        (run / "APPROVED").write_text("", encoding="utf-8")
+    record(run, "spec", "approved", ticket=ticket, note="human")
 
 
 def _clear_stage_done(run: Path) -> None:
@@ -173,6 +184,7 @@ def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
     key = require_key(key)
     run = fetch_issue(key, cfg)
     repo = prepare_workspace(origin, cfg, run)
+    print(workspace_notice(repo))
     load_or_build(repo)
     issue = json.loads((run / "issue.json").read_text(encoding="utf-8"))
     update_state(
@@ -185,7 +197,8 @@ def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
     )
     record(run, "fetch", "ok", ticket=key, note=str(repo))
     record(run, "spec", "started", ticket=key)
-    progress(cfg, key, "on_start", f"dev-loop started in {repo.name}")
+    jira = progress(cfg, key, "on_start", f"dev-loop started in {repo.name}")
+    record(run, "jira", jira["status"], ticket=key, note=f"{jira['event']} {jira.get('note') or ''}".strip())
     _clear_stage_done(run)
     for name in ("APPROVED",):
         p = run / name
@@ -210,7 +223,7 @@ def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
     else:
         record(run, "spec", "waiting_approval", ticket=key, artifact="spec.md", note="human gate — spec, not the whole ticket")
         print(f"dev-loop: spec waiting approval. Read `{run / 'progress.md'}`.")
-        print(f"Accept: touch `{run / 'SPEC_APPROVED'}` (or APPROVED), then continue {key}")
+        print(f"Accept: `dev-loop approve {key}` after the spec AskQuestion")
     if cfg.runtime.auto_continue and spec_is_approved(run):
         continue_loop(key, repo, cfg, wait=not cfg.runtime.no_launch)
 
@@ -219,11 +232,11 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
     cfg = cfg or load_config()
     key = require_key(key)
     st = load_state()
-    origin = Path(repo or st.get("origin_repo") or st.get("repo") or os.getcwd())
     run = run_dir(key)
     leased = (run / "lease.json").is_file()
-    repo = workspace_for_run(run, origin)
+    repo = workspace_for_ticket(key, repo, st)
     repo = require_repo(repo, cfg, check_location=not leased)
+    print(workspace_notice(repo))
     lv = decide_lavish(cfg, repo)
     (run / "lavish.json").write_text(
         json.dumps({"enabled": lv.enabled, "reason": lv.reason}, indent=2) + "\n",
@@ -337,11 +350,8 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                     verdict = {"verdict": "needs_improvement", "summary": "unreadable verdict.json"}
             v = str(verdict.get("verdict") or "").lower().replace(" ", "-")
             verdict["verdict"] = v
-            if cfg.agent_memory.auto_apply and isinstance(verdict.get("metadata"), list) and verdict.get("metadata"):
-                results = apply_from_verdict(repo, verdict)
-                (run / "memory-applied.json").write_text(
-                    json.dumps(results, indent=2) + "\n", encoding="utf-8"
-                )
+            results = apply_run_memory(cfg, repo, run)
+            if results:
                 record(
                     run,
                     "agent-memory",
@@ -386,10 +396,11 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
 
     rels = changed_since(repo, load_snapshot(snap_path))
     (run / "touched.txt").write_text("\n".join(rels) + ("\n" if rels else ""), encoding="utf-8")
-    body = pr_body(key, summary, spec, verdict, True, evidence=evidence_md)
+    extras = pr_body_inputs(cfg, repo, run)
+    body = pr_body(key, summary, spec, verdict, True, evidence=evidence_md, **extras)
     (run / "pr.md").write_text(body, encoding="utf-8")
     try:
-        prs = ship_work(repo, rels, key, summary, spec, verdict, cfg, evidence=evidence_md)
+        prs = ship_work(repo, rels, key, summary, spec, verdict, cfg, evidence=evidence_md, run=run, **extras)
     except Exception as exc:  # noqa: BLE001
         branch = current_branch(repo)
         update_state(stage="ship-failed", error=str(exc), branch=branch)
@@ -411,7 +422,7 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
     last = prs[-1] if prs else None
     update_state(stage="shipped", pr_number=last, pr_numbers=prs, branch=branch)
     if last:
-        progress(cfg, key, "on_pr", f"PR #{last} opened on {branch}")
+        progress(cfg, key, "on_pr", pr_comment_text(cfg, last, branch, repo=repo))
         record(run, "ship", "pr", ticket=key, note=f"#{last} {branch}")
         print(f"dev-loop: PR #{last} on {branch}" + (f" (stack {len(prs)})" if len(prs) > 1 else ""))
     else:

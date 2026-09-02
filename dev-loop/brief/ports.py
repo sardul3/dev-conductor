@@ -27,22 +27,30 @@ class KeysPort(Connector):
         from session_start import cached_keys, store_keys
 
         cfg = cfg or load_config()
+        recent = bool(kwargs.get("recent"))
+        silent = bool(kwargs.get("silent", True))
         ttl = max(60, int(cfg.session_start.cache_minutes) * 60)
-        found = cached_keys(ttl)
+        found = None if recent else cached_keys(ttl)
         if found is None:
             try:
                 base, email, token = jira_creds(cfg)
+                jql = cfg.jql
+                if recent and cfg.jira.project:
+                    jql = f"project = {cfg.jira.project} ORDER BY updated DESC"
                 found = search_keys(
                     base,
                     email,
                     token,
-                    cfg.jql,
+                    jql,
                     max_results=cfg.jira.max_keys,
                     search_path=cfg.jira.search_path,
                     timeout=cfg.jira.timeout_sec,
                 )
-                store_keys(found)
+                if not recent:
+                    store_keys(found)
             except Exception:
+                if not silent:
+                    raise
                 found = []
         limit = int(cfg.session_start.keys_limit or 15)
         rows = [{"key": str(k)} for k in found[:limit]]
@@ -88,12 +96,18 @@ class StatusPort(Connector):
         from progress import backfill, load_status
         from state import load_state
 
+        from treehouse import lease_workspace
+
         st = dict(state if state is not None else load_state())
         key = str(st.get("ticket") or "")
         events: list[dict[str, Any]] = []
         launches = tokens = 0
+        workspace = ""
         if key:
             run = run_dir(key)
+            wt = lease_workspace(run)
+            if wt is not None:
+                workspace = str(wt)
             if run.is_dir():
                 backfill(run)
                 hist = list(load_status(run).get("history") or [])
@@ -105,6 +119,7 @@ class StatusPort(Connector):
             "ticket": key,
             "stage": st.get("stage") or "",
             "repo": st.get("repo") or "",
+            "workspace": workspace or st.get("repo") or "",
             "launches": launches,
             "tokens": tokens,
             "events": events,
@@ -127,7 +142,7 @@ class ProgressPort(Connector):
 
         dest = run or (run_dir(key) if key else None)
         if dest is None or not dest.is_dir():
-            return {"ticket": key, "now": "", "events": []}
+            return {"ticket": key, "now": "", "workspace": "", "events": []}
         backfill(dest)
         data = load_status(dest)
         cur = data.get("current") or {}
@@ -136,7 +151,15 @@ class ProgressPort(Connector):
             {"at": e.get("at"), "stage": e.get("stage"), "status": e.get("status")}
             for e in list(data.get("history") or [])[-8:]
         ]
-        return {"ticket": key or dest.name, "now": now, "events": events}
+        from treehouse import lease_workspace
+
+        wt = lease_workspace(dest)
+        return {
+            "ticket": key or dest.name,
+            "now": now,
+            "workspace": str(wt) if wt is not None else "",
+            "events": events,
+        }
 
 
 class InferPort(Connector):

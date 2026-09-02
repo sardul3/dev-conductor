@@ -3,12 +3,28 @@ description: Jira-to-PR conductor via shared CLI. Use when the user says dev-loo
 alwaysApply: false
 ---
 
-Cursor has no Claude SessionStart. Run the shared CLI (Claude constructs stay in `skills/` and `claude/`):
+Cursor agent is the conductor. CLI is a **stepper** — never a 24h wait.
 
 ```bash
-python3 ~/.claude/hooks/dev-loop/cli.py start KEY --repo PATH
+dev-loop start KEY --repo PATH
+dev-loop step KEY
 ```
 
-Config: `~/.config/dev-conductor/dev-loop/config.yaml`. Skills: repo `skills/` (installed to `~/.cursor/skills`).
+After `start`/`step`, if `dev-loop: workspace PATH` (or `progress`/`status` `workspace`) is set: first action is `cursor-app-control` `move_agent_to_root` (`rootPath` = that path). GetDynamicTools first. Mandatory — do not work in the clone.
 
-Poller: `python3 ~/.claude/hooks/dev-loop/cli.py poll` / `install-poller`. Real Jira: ATLASSIAN_* in secrets.env.
+`continue` with `runtime.agent: cursor` is an alias of `step`. Do not use `continue --no-wait` (that runs every remaining stage with no agent).
+
+Handshake under `~/.config/dev-conductor/dev-loop/runs/KEY/`:
+
+- `STAGE_DONE` / `SESSION_DONE` — this agent writes when the **stage** is done
+- `SPEC_APPROVED` — `dev-loop approve KEY` after AskQuestion yes. Do not write four handshake files.
+- Grill in this chat with AskQuestion (recommended option first). Never markdown `❓` and never paste CLI `--help`.
+- Later stages: `dev-loop step KEY` after `STAGE_DONE`
+
+Test-writer: spawn a **new Agent** whose prompt is only `spec.md` + `contracts.md`. Do not Read `src/main` in the parent chat. `beforeReadFile` also denies impl reads while `state.stage` is `test-writer`.
+
+sessionStart lists open Jira keys when cwd is under `dev_root`.
+
+Config: `~/.config/dev-conductor/dev-loop/config.yaml` (`runtime.agent: cursor`). Secrets: `~/.config/dev-conductor/secrets.env`. No Jira/GitHub MCP.
+
+Ship: visual evidence (png/video) in `runs/KEY/evidence/` for every ticket; verify.log is not enough. PR body: Jira `[KEY](base/browse/KEY)` link, recipe commands. No spec excerpt. Never bare `Jira: KEY`.

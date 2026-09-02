@@ -22,6 +22,7 @@ from conductor import launch_prompt  # noqa: E402
 
 def _cfg(**caps) -> DevLoopConfig:
     cfg = DevLoopConfig()
+    cfg.workflow.enabled = False
     cfg.runtime.no_launch = False
     cfg.runtime.agent = "claude"
     cfg.runtime.launch_script = "/nonexistent/launch.sh"

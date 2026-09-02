@@ -211,6 +211,8 @@ class EvidenceCfg:
     timeout_sec: int = 8
     probes: list = None  # type: ignore[assignment]
     playwright_cmd: str = ""
+    # Default on: ship refuses without png/jpg/webp/gif/webm/mp4 under runs/KEY/evidence/.
+    require_visual: bool = True
 
     def __post_init__(self) -> None:
         if self.probes is None:
@@ -244,9 +246,12 @@ class PollerCfg:
             self.bot_logins = []
 
 
+DEFAULT_ON_PR_COMMENT = "PR #{number} opened on {branch}\n{pr_url}"
+
+
 @dataclass
 class WorkflowCfg:
-    enabled: bool = False
+    enabled: bool = True
     on_start: str = "In Progress"
     on_pr: str = "In Review"
     on_merge: str = "Done"
@@ -255,6 +260,9 @@ class WorkflowCfg:
     deploy_ticket_jql: str = ""
     deploy_ticket_key: str = ""
     comment_on_progress: bool = True
+    assign_on_start: bool = True
+    assign_force: bool = False
+    on_pr_comment: str = DEFAULT_ON_PR_COMMENT
 
 
 @dataclass
@@ -548,6 +556,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             timeout_sec=int(ev_d.get("timeout_sec") or 8),
             probes=list(ev_d.get("probes") or []) if isinstance(ev_d.get("probes"), list) else [],
             playwright_cmd=str(ev_d.get("playwright_cmd") or ""),
+            require_visual=bool(ev_d.get("require_visual", True)),
         ),
         lavish=LavishCfg(
             enabled=str(lav_d.get("enabled") or "auto"),
@@ -566,7 +575,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             merge_method=str(pol_d.get("merge_method") or git_d.get("merge_method") or "squash"),
         ),
         workflow=WorkflowCfg(
-            enabled=bool(wf_d.get("enabled", False)),
+            enabled=bool(wf_d.get("enabled", True)),
             on_start=str(wf_d.get("on_start") or "In Progress"),
             on_pr=str(wf_d.get("on_pr") or "In Review"),
             on_merge=str(wf_d.get("on_merge") or "Done"),
@@ -575,6 +584,9 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             deploy_ticket_jql=str(wf_d.get("deploy_ticket_jql") or ""),
             deploy_ticket_key=str(wf_d.get("deploy_ticket_key") or ""),
             comment_on_progress=bool(wf_d.get("comment_on_progress", True)),
+            assign_on_start=bool(wf_d.get("assign_on_start", True)),
+            assign_force=bool(wf_d.get("assign_force", False)),
+            on_pr_comment=str(wf_d.get("on_pr_comment") or DEFAULT_ON_PR_COMMENT),
         ),
         stages_enabled=enabled,
         autonomy=AutonomyCfg(

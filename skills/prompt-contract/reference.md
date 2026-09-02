@@ -1,6 +1,6 @@
 # Assembled prompt shape
 
-The handoff file launched by `launch-clean-claude.sh` must start with the skip marker so the next session does not re-enrich.
+The handoff file (Claude `launch-clean-claude.sh` or Cursor `~/.config/dev-conductor/handoffs/`) must start with the skip marker so the next session does not re-enrich. Do not use this file for `/dev-loop` spec — that stays in-chat as `spec.md`.
 
 ```markdown
 <!-- PROMPT_CONTRACT_V1 -->

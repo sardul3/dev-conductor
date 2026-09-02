@@ -47,3 +47,16 @@ class SessionStartTests(unittest.TestCase):
                 # empty store must not rewrite a hit
             finally:
                 os.environ.pop("DEVLOOP_HOME", None)
+
+
+class SessionStartCursorTests(unittest.TestCase):
+    def test_given_keys_when_cursor_output_then_additional_context(self) -> None:
+        from session_start import cursor_session_output
+
+        out = cursor_session_output("ASE-1 ASE-2")
+        self.assertEqual(out["additional_context"], "dev-loop Jira keys: ASE-1 ASE-2\nStart a ticket: /dev-loop KEY")
+
+    def test_given_no_keys_when_cursor_output_then_empty(self) -> None:
+        from session_start import cursor_session_output
+
+        self.assertEqual(cursor_session_output(None), {})
