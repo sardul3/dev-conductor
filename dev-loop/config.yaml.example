@@ -60,7 +60,7 @@ queue:
   max_active: 3
 
 runtime:
-  # claude = launch-clean-claude.sh; cursor = write prompts only (run in Cursor);
+  # claude = launch-clean-claude.sh then wait; cursor = one-stage `cli.py step` (never polls);
   # none = no terminals (eval / builtin adapters).
   agent: claude
   launch_script: ~/.claude/hooks/prompt-enrich/launch-clean-claude.sh

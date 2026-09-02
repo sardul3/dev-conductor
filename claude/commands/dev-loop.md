@@ -16,7 +16,17 @@ python3 ~/.claude/hooks/dev-loop/cli.py start KEY --repo PATH
 
 New project: `python3 ~/.claude/hooks/dev-loop/cli.py init-repo FOLDER-NAME` then start with that path.
 
-If `$ARGUMENTS` is empty, ask for the Jira key. After spec approval (`SPEC_APPROVED` or `APPROVED` in the run dir). Check `progress.md` for which stage is current:
+If `$ARGUMENTS` is empty, ask for the Jira key. After spec approval (`SPEC_APPROVED` or `APPROVED` in the run dir):
+
+**Cursor** (`runtime.agent: cursor`):
+
+```bash
+python3 ~/.claude/hooks/dev-loop/cli.py step KEY --repo PATH
+```
+
+Each `step` is one stage. Write `STAGE_DONE` then `step` again. Test-writer uses a new Agent.
+
+**Claude Code:**
 
 ```bash
 python3 ~/.claude/hooks/dev-loop/cli.py continue KEY --repo PATH

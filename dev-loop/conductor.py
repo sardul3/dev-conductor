@@ -13,7 +13,7 @@ from gitutil import current_branch, default_branch, denylisted, github_remote, i
 from jira_client import get_issue
 from memory import load_or_build
 from paths import run_dir
-from agent_memory import apply_from_verdict
+from agent_memory import apply_run_memory
 from prompts import review_prompt, simplify_prompt, spec_prompt, test_writer_prompt, writer_prompt
 from evidence import capture_evidence
 from jira_workflow import progress
@@ -117,7 +117,7 @@ def launch_prompt(prompt: str, repo: Path, run: Path, name: str, cfg: DevLoopCon
 
 
 def wait_file(path: Path, cfg: DevLoopConfig) -> bool:
-    if cfg.runtime.builtin_adapters or cfg.runtime.agent == "none":
+    if cfg.runtime.builtin_adapters or cfg.runtime.agent in {"none", "cursor"}:
         return path.is_file()
     start = time.time()
     timeout = max(1, int(cfg.runtime.wait_timeout_sec))
@@ -130,7 +130,7 @@ def wait_file(path: Path, cfg: DevLoopConfig) -> bool:
 
 
 def wait_session_done(run: Path, cfg: DevLoopConfig) -> bool:
-    if cfg.runtime.builtin_adapters or cfg.runtime.agent == "none":
+    if cfg.runtime.builtin_adapters or cfg.runtime.agent in {"none", "cursor"}:
         return (run / "STAGE_DONE").is_file() or (run / "SESSION_DONE").is_file()
     start = time.time()
     timeout = max(1, int(cfg.runtime.wait_timeout_sec))
@@ -337,11 +337,8 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                     verdict = {"verdict": "needs_improvement", "summary": "unreadable verdict.json"}
             v = str(verdict.get("verdict") or "").lower().replace(" ", "-")
             verdict["verdict"] = v
-            if cfg.agent_memory.auto_apply and isinstance(verdict.get("metadata"), list) and verdict.get("metadata"):
-                results = apply_from_verdict(repo, verdict)
-                (run / "memory-applied.json").write_text(
-                    json.dumps(results, indent=2) + "\n", encoding="utf-8"
-                )
+            results = apply_run_memory(cfg, repo, run)
+            if results:
                 record(
                     run,
                     "agent-memory",

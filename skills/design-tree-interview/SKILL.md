@@ -1,11 +1,11 @@
 ---
 name: design-tree-interview
-description: Relentless design-tree interview. Use when stress-testing a plan, grilling a design, or filling a deep-ask contract. Explores the repo for facts; asks the user only for decisions.
+description: Relentless design-tree interview until the frontier is empty. Use when grilling a /dev-loop spec, stress-testing a plan, filling a prompt-contract, or the user says grill me / design interview. Looks up facts; asks the user only for decisions. Do not implement during the interview.
 ---
 
 # Design-tree interview
 
-Interview until shared understanding. Treat the work as a **design tree**: each decision unlocks the decisions that depend on it.
+Treat the work as a **design tree**: each decision unlocks the decisions that depend on it. Asking one isolated question wastes rounds; asking internals the filesystem already answers wastes the user's attention.
 
 ## Rounds
 
@@ -13,12 +13,6 @@ The **frontier** is every question whose prerequisites are already settled. Ask 
 
 ```
 ❓ **Q1** - **<title>**: <body, choices if useful>
-
-➡️ <recommended answer>
-
----
-
-❓ **Q2** - **<title>**: ...
 
 ➡️ <recommended answer>
 ```
@@ -30,18 +24,24 @@ After answers, recompute the frontier. A question that still depends on an open 
 - **Facts** (filesystem, git, tests, types, existing APIs): look them up. Do not ask the user.
 - **Decisions** (product, trade-offs, taste): ask the user. Wait.
 
-### Prompt-enrich session (injected; no repo explore)
+## Which ending (pick one)
 
-You cannot Glob, Grep, Explore, or spawn agents. For facts, **Read only** these files if they exist in cwd: `README.md`, `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `composer.json`. Infer stack from those. Do not ask the user whether the app is Python vs Node if `package.json` or `pyproject.toml` already says.
+**A — `/dev-loop` spec** (prompt loaded `story-spec`, or run dir has `issue.md`):
 
-`AskUserQuestion` allows **at most 4 options** per question. If you need more choices, ask in numbered markdown instead.
+Empty frontier → write `spec.md` per `story-spec`. Stop. Do **not** implement, `session-handoff`, or `launch-clean-claude.sh`. The user still has to approve the spec.
 
-When the frontier is empty, follow `session-handoff` (pipe to `save_handoff.py`, never Write to `/tmp`) and run `~/.claude/hooks/prompt-enrich/launch-clean-claude.sh --file <handoff-path>`. Stop after launch.
+**B — Cursor ad-hoc grill** (user asked to grill a plan, not a ticket):
 
-Otherwise (not an enrich session): dispatch a subagent if the search is large. A running lookup is an unsettled prerequisite only for questions that depend on it; ask the rest of the frontier now.
+Empty frontier → `session-handoff` into `~/.config/dev-conductor/handoffs/`. Spawn a new Cursor Agent with that file. Stop.
+
+**C — Claude prompt-enrich** (injected enrich session; no Glob/Grep/Explore/Agent):
+
+For facts, **Read only** cwd `README.md`, `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `composer.json`. Infer stack from those.
+
+`AskUserQuestion` allows **at most 4 options** per question; otherwise numbered markdown.
+
+Empty frontier → fill remaining prompt-contract slots, `session-handoff` via `save_handoff.py` (never Write `/tmp`), `launch-clean-claude.sh --file <path>`. Stop after launch. Do not implement in this tab.
 
 ## Stop
 
-The frontier is empty: every branch visited, nothing silently assumed. Do **not** implement until the user confirms shared understanding.
-
-If this interview is feeding the prompt-enrich pipeline, also fill the nine contract slots (role, audience, goal, context, constraints, format, length/tone, success criteria, model profile) from the tree; infer slots you already know. Then follow `session-handoff`. Stop after launch.
+Frontier empty means every branch visited, nothing silently assumed. Do **not** implement until the user confirms shared understanding (spec approve, or they skip grill).

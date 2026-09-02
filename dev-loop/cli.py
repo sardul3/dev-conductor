@@ -71,6 +71,7 @@ def cmd_start(ns: argparse.Namespace) -> int:
 def cmd_continue(ns: argparse.Namespace) -> int:
     from budget import BudgetExhausted
     from pick import resolve_repo
+    from step import step
 
     cfg = _cfg(ns)
     if ns.repo:
@@ -78,9 +79,31 @@ def cmd_continue(ns: argparse.Namespace) -> int:
     else:
         st = load_state()
         repo = Path(st["repo"]).expanduser() if st.get("repo") else resolve_repo(cfg, None, require=None)
+    if cfg.runtime.agent == "cursor":
+        try:
+            return step(ns.key, repo, cfg)
+        except BudgetExhausted as exc:
+            return fail(str(exc), code=2)
     wait = not ns.no_wait
     try:
         return continue_loop(ns.key, repo, cfg, wait=wait)
+    except BudgetExhausted as exc:
+        return fail(str(exc), code=2)
+
+
+def cmd_step(ns: argparse.Namespace) -> int:
+    from budget import BudgetExhausted
+    from pick import resolve_repo
+    from step import step
+
+    cfg = _cfg(ns)
+    if ns.repo:
+        repo = resolve_repo(cfg, ns.repo, require=None)
+    else:
+        st = load_state()
+        repo = Path(st["repo"]).expanduser() if st.get("repo") else resolve_repo(cfg, None, require=None)
+    try:
+        return step(ns.key, repo, cfg)
     except BudgetExhausted as exc:
         return fail(str(exc), code=2)
 
@@ -295,11 +318,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--repo")
     s.set_defaults(func=cmd_start)
 
-    s = sub.add_parser("continue", help="After spec approved: test-writer through PR")
+    s = sub.add_parser("continue", help="After spec approved: test-writer through PR (blocking unless agent=cursor)")
     s.add_argument("key")
     s.add_argument("--repo")
     s.add_argument("--no-wait", action="store_true")
     s.set_defaults(func=cmd_continue)
+
+    s = sub.add_parser("step", help="Cursor: run the next incomplete stage and return (never polls)")
+    s.add_argument("key")
+    s.add_argument("--repo")
+    s.set_defaults(func=cmd_step)
 
     s = sub.add_parser("fetch")
     s.add_argument("key")

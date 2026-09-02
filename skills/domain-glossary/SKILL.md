@@ -1,11 +1,11 @@
 ---
 name: domain-glossary
-description: Maintain CONTEXT.md glossary and sparse ADRs. Use when sharpening domain language, writing CONTEXT.md, or recording a hard-to-reverse decision.
+description: Maintain CONTEXT.md as a glossary and write sparse ADRs when a decision is hard to reverse. Use when sharpening domain language, the user contradicts an existing term, grill-plan-docs is running, or a review resolved a named concept. Do not dump implementation notes into the glossary.
 ---
 
 # Domain glossary
 
-This is for **changing** the domain model, not for merely reading vocabulary.
+This is for **changing** the domain model, not for merely reading vocabulary. Vague words in a spec become tests that spy on the wrong objects.
 
 ## Layout
 
@@ -51,3 +51,5 @@ Offer an ADR only when all three hold: hard to reverse, surprising without conte
 ```
 
 When feedback (self-review or user/PR review) resolves a term or hard-to-reverse decision, update here. For non-glossary conventions (AGENTS.md, path-scoped rules), load `agent-memory` instead.
+
+In `/dev-loop` spec, keep acceptance in `spec.md`. Glossary updates are extra, not a substitute for seams.

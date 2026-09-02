@@ -72,6 +72,20 @@ def store_keys(keys: list[str]) -> None:
     p.write_text(json.dumps({"ts": time.time(), "keys": keys}) + "\n", encoding="utf-8")
 
 
+def cursor_session_output(keys_line: str | None) -> dict:
+    if not keys_line:
+        return {}
+    return {
+        "additional_context": (
+            f"dev-loop Jira keys: {keys_line}\nStart a ticket: /dev-loop KEY"
+        )
+    }
+
+
+def format_keys_line(keys: list[str], limit: int) -> str:
+    return " ".join(keys[:limit])
+
+
 def main() -> int:
     if os.environ.get("DEVLOOP_DISABLE"):
         return 0

@@ -1,26 +1,31 @@
 ---
 name: tdd
-description: Use when implementing a feature or bugfix, before writing production code. Test first, watch it fail, then implement. Vertical slices at public seams.
+description: Test-first implementation at public seams. Use when implementing a feature or bugfix, in the /dev-loop writer stage after test-writer, or when the user says TDD / write tests first. Do not start production code until a test is red for the right reason.
 ---
 
 # TDD
 
-Write a failing test first. Watch it fail for the right reason. Then write the minimum code to pass.
+A test that is written after the code only records what you already built. A test written first states the behavior. `/dev-loop` splits that work: **test-writer** already added the red suite; this skill is how the **writer** turns it green without sneaking in extra production code.
 
-**Iron law:** no production code without a failing test first (non-trivial logic).
+## Loop mode (`/dev-loop` writer)
 
-Inspired by [mattpocock/skills tdd](https://www.skills.sh/mattpocock/skills/tdd): tests verify **behavior at public seams**, not internals. One **vertical slice** (one test → enough code → next test). Do not write the whole suite then implement (horizontal slice).
+Tests already exist and should be red. Do **not** add a new test first unless `verify.log` shows a missing case from the spec.
 
-## Cycle
+1. Run the inferred test command. Confirm red is an assertion at a spec seam, not a compile error you caused.
+2. **Green** — smallest production change that passes **one** failing case (one vertical slice).
+3. **Refactor** — stay green. Then the next red test.
+4. Do not rewrite tests to match leftover production code unless they contradict the spec or fail to compile from syntax/IO mistakes.
+5. Work-session tone: load `implement-terse`. Do not git commit (the conductor ships).
 
-1. **Red** — one test that states the behavior through a public API. Run it. Confirm it fails as expected.
-2. **Green** — smallest change that passes. Do not reshape the test to match leftover production code.
-3. **Refactor** — stay green. Extract duplication only after green.
+This is still TDD: you are not allowed to implement behavior that has no failing test. The suite is the backlog, not a finished horizontal spec you ignore.
 
-## Rules
+## Standalone mode (no conductor)
+
+Write a failing test first. Watch it fail for the right reason. Then minimum code to pass. Do not write the whole suite then implement (that horizontal slice is what **test-writer** is for, inside `/dev-loop` only).
+
+## Both modes
 
 - Name tests Given/When/Then.
-- Test at seams agreed in the spec (HTTP handler, service port). Never private helpers.
-- Do not skip “just this once.”
-- If you implemented first, delete it and start from the test (unless the user forbids it).
-- Work sessions: `implement-terse`. Grill sessions: do not implement.
+- Test at spec seams (HTTP handler, exported port). Never private helpers.
+- If you implemented first in standalone mode, delete the production change and start from the test unless the user forbids it.
+- Grill / spec sessions: do not implement at all.

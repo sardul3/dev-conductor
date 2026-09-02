@@ -1,36 +1,42 @@
 ---
 name: dev-loop
-description: Start the Jira-to-PR developer loop for a ticket. Use when the user says /dev-loop, work this Jira story, or run the conductor from a repo under ~/dev.
+description: Run the Jira-to-PR conductor for a ticket. Use when the user says /dev-loop, names a Jira key (ASE-12, LAB-1), says work this story/ticket, or asks to start the conductor from a repo under ~/dev. Do not use Jira MCP or GitHub MCP.
 ---
 
 # Dev-loop
 
-Run the conductor. Do not use Jira MCP or GitHub MCP. Knobs live in `~/.config/dev-conductor/dev-loop/config.yaml`. Real Jira needs `ATLASSIAN_BASE_URL`, `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN` in `~/.config/dev-conductor/secrets.env`.
-
-## Repo (do not guess)
-
-If the user did not pass `--repo` and the current directory is not a git repo under `~/dev`:
-
-1. Run `python3 ~/.claude/hooks/dev-loop/cli.py repos --format json` and read the JSON.
-2. **Ask the user with a dropdown** (Cursor: AskQuestion). Options: every `candidates[].label` (id = `path`) plus one extra option id `__create__` labeled with `create_label`.
-3. Never pick a folder unless the user selected it.
-4. If they choose `__create__`, ask for a folder name, then:
-   `python3 ~/.claude/hooks/dev-loop/cli.py init-repo NAME`
-   Use the printed path as `--repo`.
-5. If they choose a `folder` (not `git`), `init-repo` that name or `start` will git-init it. Prefer `init-repo` so GitHub remote is created.
-6. Then:
-   `python3 ~/.claude/hooks/dev-loop/cli.py start KEY --repo PATH`
-
-If cwd is already the right git repo, `start KEY` without `--repo` is fine.
+The CLI owns fetch, verify, and ship. You own grilling, tests, implementation, and handshake files. Secrets: `ATLASSIAN_*` in `~/.config/dev-conductor/secrets.env`. Config: `~/.config/dev-conductor/dev-loop/config.yaml`.
 
 ```bash
-python3 ~/.claude/hooks/dev-loop/cli.py start KEY [--repo PATH]
-python3 ~/.claude/hooks/dev-loop/cli.py continue KEY
+CLI="python3 ~/.claude/hooks/dev-loop/cli.py"
 ```
 
-Poller: `cli.py poll` / `install-poller`. Never commit `main`/`master`.
-Agent reads use brief output (`cli.py` with no args, `keys`, `status`, `progress`). Picker JSON is `--format json`. New connector: `brief.Connector` + `fetch()`.
+Never guess the repo. Never `continue --no-wait` (that runs every remaining stage with no agent). Never `finish-branch` — ship is `step` / `continue`. Never commit `main`/`master`.
 
-Long-run caps (`caps.max_launches` / `max_tokens` / `max_budget_usd` / `wall_sec`, 0 = off) stop further agent launches and write `STOPPED` in the run dir. Unattended still needs these set; they do not default on. Parallelism is `queue.max_active` (worktree/treehouse slots), not tmux fan-out.
+## 1. Repo
 
-Isolation: example config uses `git.isolation: worktree` (native git worktree under `.{repo}-worktrees/{KEY}`) and `queue.max_active: 3`. `treehouse` remains opt-in. Start from the clone under `~/dev`. A fourth in-progress ticket exits until one ships or you release its worktree/lease.
+If the user did not pass `--repo` and cwd is not the git repo under `~/dev`:
+
+1. `$CLI repos --format json`
+2. AskQuestion dropdown: each `candidates[].label` (id = `path`) plus `__create__` labeled `create_label`.
+3. `__create__` → ask for a folder name → `$CLI init-repo NAME` → use printed path.
+4. `folder` (not `git`) → prefer `init-repo` so the GitHub remote exists.
+
+Then `$CLI start KEY --repo PATH`. If cwd is already that repo, `$CLI start KEY` is enough.
+
+## 2. After start
+
+Grill in this chat (`story-spec`). On **user yes**, write `SPEC_APPROVED` then:
+
+| Runtime | Command |
+| ------- | ------- |
+| Cursor (`runtime.agent: cursor`) | `$CLI step KEY` — one stage, return |
+| Claude (`agent: claude`) | `$CLI continue KEY` — blocking loop |
+
+**Cursor stages:** each `step` prints a prompt path. Do that work, write `STAGE_DONE` (and `SESSION_DONE`), then `step` again. Test-writer: Task a **new** Agent. `SPEC_APPROVED` is spec-only, not ticket-done.
+
+Handshake dir: `~/.config/dev-conductor/dev-loop/runs/KEY/`. Check `$CLI progress KEY` if lost.
+
+## 3. Status while running
+
+Agent-facing CLI is brief (`$CLI`, `keys`, `status`, `progress`). Caps (`STOPPED` in the run dir), worktrees, poller: [reference.md](reference.md).

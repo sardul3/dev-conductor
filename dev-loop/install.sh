@@ -3,6 +3,15 @@
 # Merges hooks; does not wipe CCR env / apiKeyHelper.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+python3 - <<'PY'
+import sys
+if sys.version_info < (3, 10):
+    sys.stderr.write(
+        f"dev-conductor needs Python 3.10+ (this is {sys.version.split()[0]}). "
+        "Install python@3.12 or pyenv, then re-run.\n"
+    )
+    raise SystemExit(1)
+PY
 HOOK_DEST="${HOME}/.claude/hooks/dev-loop"
 CMD_DEST="${HOME}/.claude/commands"
 LEGACY_CFG="${HOME}/.config/mac-ai-setup"

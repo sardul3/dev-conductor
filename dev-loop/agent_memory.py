@@ -185,3 +185,45 @@ def apply_verdict_file(repo: Path, verdict_path: Path) -> list[dict[str, Any]]:
     if not isinstance(data, dict):
         raise ApplyError("verdict.json must be an object")
     return apply_from_verdict(repo, data)
+
+
+def _load_json_object(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _metadata_items(*blobs: dict[str, Any]) -> list[Any]:
+    items: list[Any] = []
+    seen: set[str] = set()
+    for blob in blobs:
+        raw = blob.get("metadata")
+        if not isinstance(raw, list):
+            continue
+        for item in raw:
+            key = json.dumps(item, sort_keys=True, default=str)
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(item)
+    return items
+
+
+def apply_run_memory(cfg: Any, repo: Path, run: Path) -> list[dict[str, Any]]:
+    """Apply verdict.json + memory.json metadata[] into the ticket repo when auto_apply is on."""
+    auto = True
+    agent_mem = getattr(cfg, "agent_memory", None)
+    if agent_mem is not None:
+        auto = bool(getattr(agent_mem, "auto_apply", True))
+    if not auto:
+        return []
+    items = _metadata_items(_load_json_object(run / "verdict.json"), _load_json_object(run / "memory.json"))
+    if not items:
+        return []
+    results = apply_from_verdict(repo, {"metadata": items})
+    (run / "memory-applied.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
+    return results

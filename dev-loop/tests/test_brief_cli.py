@@ -77,6 +77,12 @@ class BriefCliTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             cli.build_parser().parse_args(["status", "--nope"])
 
+    def test_given_step_args_when_parse_then_cmd_step(self) -> None:
+        ns = cli.build_parser().parse_args(["step", "ASE-9", "--repo", "/tmp/lab"])
+        self.assertEqual(ns.cmd, "step")
+        self.assertEqual(ns.key, "ASE-9")
+        self.assertEqual(ns.repo, "/tmp/lab")
+
 
 if __name__ == "__main__":
     unittest.main()
