@@ -40,7 +40,7 @@ class Route:
     fallbacks: list[str] = field(default_factory=list)
 
 
-def load_catalog(path: Path | None = None) -> dict:
+def load_catalog(path: Path | None = None, *, backend: str = "anthropic") -> dict:
     if path is not None:
         catalog_path = path
     elif os.environ.get("PROMPT_ENRICH_ROUTER"):
@@ -48,8 +48,27 @@ def load_catalog(path: Path | None = None) -> dict:
     else:
         home_cat = Path.home() / ".claude" / "prompt-enrichment" / "model-router.yaml"
         catalog_path = home_cat if home_cat.is_file() else DEFAULT_CATALOG
-    text = catalog_path.read_text(encoding="utf-8")
-    return json.loads(text)
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    if backend != "ccr":
+        return data
+    ccr_path = catalog_path.with_name("model-router.ccr.yaml")
+    if not ccr_path.is_file():
+        ccr_path = DEFAULT_CATALOG.parent / "model-router.ccr.yaml"
+    if ccr_path.is_file():
+        extra = json.loads(ccr_path.read_text(encoding="utf-8"))
+        merged = dict(data)
+        for key in ("ccr", "ccr_free_chain", "aliases"):
+            if key in extra:
+                if key == "aliases":
+                    base_aliases = dict(merged.get("aliases") or {})
+                    for alias, mapping in (extra.get("aliases") or {}).items():
+                        if isinstance(mapping, dict):
+                            base_aliases.setdefault(alias, {}).update(mapping)
+                    merged["aliases"] = base_aliases
+                else:
+                    merged[key] = extra[key]
+        return merged
+    return data
 
 
 def _looks_local_gateway(value: str) -> bool:
@@ -60,17 +79,6 @@ def detect_backend(env: dict[str, str], settings: dict) -> str:
     explicit = (env.get("PROMPT_ENRICH_BACKEND") or "").strip().lower()
     if explicit in {"ccr", "anthropic"}:
         return explicit
-    settings_env = settings.get("env") if isinstance(settings.get("env"), dict) else {}
-    merged = {**settings_env, **env}
-    for key in ("ANTHROPIC_BASE_URL", "ANTHROPIC_API_BASE_URL", "CLAUDE_AGENT_API_BASE_URL"):
-        if _looks_local_gateway(str(merged.get(key) or "")):
-            return "ccr"
-    helper = str(settings.get("apiKeyHelper") or env.get("CLAUDE_CODE_API_KEY_HELPER") or "")
-    if "claude-code-router" in helper:
-        return "ccr"
-    for key in ("CCR_CLAUDE_CODE_MODEL", "CODEXL_CLAUDE_CODE_MODEL"):
-        if merged.get(key):
-            return "ccr"
     return "anthropic"
 
 
@@ -88,7 +96,7 @@ def infer_profile(goal: str, context: str, output_format: str) -> str:
 
 
 def resolve(profile: str, backend: str, override: str | None = None, catalog: dict | None = None) -> Route:
-    data = catalog or load_catalog()
+    data = catalog or load_catalog(backend=backend)
     backend = backend if backend in {"ccr", "anthropic"} else "anthropic"
     why = f"profile={profile}"
     chosen = (profile or "code").strip().lower()

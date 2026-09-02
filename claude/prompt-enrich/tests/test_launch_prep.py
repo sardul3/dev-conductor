@@ -80,6 +80,9 @@ class LaunchPrepTests(unittest.TestCase):
         self.assertIn("--fallback-model", runner)
 
     def test_ccr_runner_inherits_env(self) -> None:
+        from route_model import load_catalog
+
+        catalog = load_catalog(ROOT / "model-router.ccr.yaml", backend="ccr")
         result = prepare_launch(
             CONTRACT,
             session_id="sess-1",
@@ -88,6 +91,7 @@ class LaunchPrepTests(unittest.TestCase):
             project_dir=self.project,
             backend="ccr",
             env={"ANTHROPIC_BASE_URL": "http://127.0.0.1:3456"},
+            catalog_path=ROOT / "model-router.ccr.yaml",
         )
         runner = Path(result["runner_file"]).read_text(encoding="utf-8")
         self.assertNotIn("unset ANTHROPIC_BASE_URL", runner)

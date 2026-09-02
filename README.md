@@ -16,7 +16,9 @@ cd dev-conductor
 ./install.sh
 ```
 
-Installs the CLI to `~/.claude/hooks/dev-loop/`, `/dev-loop` for Claude Code, loop skills and agents, prompt-enrich, and the Cursor port (`~/.cursor/skills`, `~/.local/bin/dev-loop`). How to send a PR: [CONTRIBUTING.md](CONTRIBUTING.md).
+Installs the CLI to `~/.claude/hooks/dev-loop/`, loop skills and agents, and the Cursor port (`~/.cursor/skills`, `~/.local/bin/dev-loop`). Assumes Claude Code and/or Cursor are already signed in — no API key or OpenRouter setup from this repo.
+
+Optional ad-hoc prompt grill for Claude Code: `./install.sh --with-enrich`. How to send a PR: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Optional path-scoped stack rules (Java, Python/ML, LLM, TypeScript, k8s, …) live in `.envfiles/rules/` and are **not** always-on:
 

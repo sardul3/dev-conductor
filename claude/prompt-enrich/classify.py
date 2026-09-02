@@ -24,7 +24,7 @@ FOLLOW_UP = re.compile(
     re.IGNORECASE,
 )
 MID_PHASES = {"enriching", "grilling", "launching"}
-DEFAULT_CLASSIFIER_MODEL = "OpenRouter/poolside/laguna-s-2.1:free"
+DEFAULT_CLASSIFIER_MODEL = "haiku"
 CLASSIFIER_PROMPT = (
     "Classify the user message for Claude Code. Reply with one character only.\n"
     "Y = new substantial task that should be interviewed before coding "
@@ -49,7 +49,7 @@ Facts: Read only cwd README.md, package.json, pyproject.toml, go.mod, Cargo.toml
    then run ~/.claude/hooks/prompt-enrich/launch-clean-claude.sh --file <printed-path>
    Never Write to /tmp.
 
-Work continues in a new `claude` terminal. This session only interviews and hands off. After launch, stop. Do not implement in this tab (duplicate OpenRouter sessions 429).
+Work continues in a new `claude` terminal. This session only interviews and hands off. After launch, stop. Do not implement in this tab.
 """
 
 
@@ -125,7 +125,7 @@ def llm_classify(prompt: str, env: dict[str, str] | None = None) -> str:
         env.get("PROMPT_ENRICH_CLASSIFIER_URL")
         or env.get("ANTHROPIC_BASE_URL")
         or env.get("ANTHROPIC_API_BASE_URL")
-        or "http://127.0.0.1:3456"
+        or "https://api.anthropic.com"
     ).rstrip("/")
     model = env.get("PROMPT_ENRICH_CLASSIFIER_MODEL") or DEFAULT_CLASSIFIER_MODEL
     key = _api_key(env)

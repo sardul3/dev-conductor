@@ -26,15 +26,14 @@ class DetectBackendTests(unittest.TestCase):
             detect_backend({"PROMPT_ENRICH_BACKEND": "anthropic", "ANTHROPIC_BASE_URL": "http://127.0.0.1:3456"}, {}),
         )
 
-    def test_localhost_gateway_is_ccr(self) -> None:
-        self.assertEqual("ccr", detect_backend({"ANTHROPIC_BASE_URL": "http://127.0.0.1:3456"}, {}))
+    def test_localhost_gateway_defaults_anthropic(self) -> None:
+        self.assertEqual("anthropic", detect_backend({"ANTHROPIC_BASE_URL": "http://127.0.0.1:3456"}, {}))
 
-    def test_prompt_log_proxy_port_still_ccr(self) -> None:
-        self.assertEqual("ccr", detect_backend({"ANTHROPIC_BASE_URL": "http://127.0.0.1:3457"}, {}))
-
-    def test_settings_env_ccr(self) -> None:
-        settings = {"env": {"ANTHROPIC_API_BASE_URL": "http://127.0.0.1:3456"}, "apiKeyHelper": "/x/claude-code-router/bin/foo"}
-        self.assertEqual("ccr", detect_backend({}, settings))
+    def test_localhost_gateway_explicit_ccr(self) -> None:
+        self.assertEqual(
+            "ccr",
+            detect_backend({"PROMPT_ENRICH_BACKEND": "ccr", "ANTHROPIC_BASE_URL": "http://127.0.0.1:3456"}, {}),
+        )
 
     def test_plain_anthropic(self) -> None:
         self.assertEqual("anthropic", detect_backend({}, {}))
@@ -42,7 +41,10 @@ class DetectBackendTests(unittest.TestCase):
 
 class ResolveTests(unittest.TestCase):
     def test_ccr_code_profile(self) -> None:
-        r = resolve("code", backend="ccr")
+        from route_model import load_catalog
+
+        catalog = load_catalog(ROOT / "model-router.ccr.yaml", backend="ccr")
+        r = resolve("code", backend="ccr", catalog=catalog)
         self.assertEqual("OpenRouter/poolside/laguna-s-2.1:free", r.primary)
         self.assertEqual("OpenRouter/nvidia/nemotron-3-super-120b-a12b:free", r.fallback)
 
@@ -64,9 +66,13 @@ class ResolveTests(unittest.TestCase):
             ("anthropic", "heavy"): "opus",
             ("anthropic", "vision"): "sonnet",
         }
+        from route_model import load_catalog
+
+        ccr_catalog = load_catalog(ROOT / "model-router.ccr.yaml", backend="ccr")
         for (backend, profile), primary in expected.items():
             with self.subTest(backend=backend, profile=profile):
-                r = resolve(profile, backend=backend)
+                catalog = ccr_catalog if backend == "ccr" else None
+                r = resolve(profile, backend=backend, catalog=catalog)
                 self.assertEqual(primary, r.primary)
 
     def test_unknown_profile_falls_to_code(self) -> None:
@@ -78,7 +84,10 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual("opus", r.primary)
 
     def test_override_alias_opus_on_ccr(self) -> None:
-        r = resolve("code", backend="ccr", override="opus")
+        from route_model import load_catalog
+
+        catalog = load_catalog(ROOT / "model-router.ccr.yaml", backend="ccr")
+        r = resolve("code", backend="ccr", override="opus", catalog=catalog)
         self.assertTrue(r.primary.startswith("OpenRouter/"))
         self.assertIn("ultra", r.primary.lower())
         self.assertTrue(r.primary.endswith(":free"))
@@ -86,8 +95,10 @@ class ResolveTests(unittest.TestCase):
     def test_ccr_catalog_is_free_only(self) -> None:
         from route_model import load_catalog
 
-        data = load_catalog()
-        r = resolve("code", backend="ccr")
+        from route_model import load_catalog
+
+        data = load_catalog(ROOT / "model-router.ccr.yaml", backend="ccr")
+        r = resolve("code", backend="ccr", catalog=data)
         self.assertGreaterEqual(len(r.fallbacks), 3)
         self.assertTrue(all(x.endswith(":free") or x.endswith("/free") for x in [r.primary, r.fallback, *r.fallbacks]))
         for profile, row in (data.get("ccr") or {}).items():
