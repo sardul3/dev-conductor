@@ -26,6 +26,7 @@ Write a failing test first. Watch it fail for the right reason. Then minimum cod
 ## Both modes
 
 - Name tests Given/When/Then.
-- Test at spec seams (HTTP handler, exported port). Never private helpers.
+- Test at spec seams (HTTP handler, exported port, app CLI). Never private helpers, linters, or package-manager commands.
+- Never `git add` `__pycache__` or `.venv`. New Python repo: add a standard `.gitignore` (`.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`).
 - If you implemented first in standalone mode, delete the production change and start from the test unless the user forbids it.
 - Grill / spec sessions: do not implement at all.

@@ -83,6 +83,25 @@ class BriefCliTests(unittest.TestCase):
         self.assertEqual(ns.key, "ASE-9")
         self.assertEqual(ns.repo, "/tmp/lab")
 
+    def test_given_format_after_repos_when_parse_then_json(self) -> None:
+        ns = cli.build_parser().parse_args(["repos", "--format", "json"])
+        self.assertEqual(ns.cmd, "repos")
+        self.assertEqual(ns.format, "json")
+
+    def test_given_format_before_repos_when_parse_then_json(self) -> None:
+        ns = cli.build_parser().parse_args(["--format", "json", "repos"])
+        self.assertEqual(ns.cmd, "repos")
+        self.assertEqual(ns.format, "json")
+
+    def test_given_keys_recent_when_parse_then_flag(self) -> None:
+        ns = cli.build_parser().parse_args(["keys", "--recent"])
+        self.assertTrue(ns.recent)
+
+    def test_given_approve_args_when_parse_then_cmd_approve(self) -> None:
+        ns = cli.build_parser().parse_args(["approve", "LCN-2"])
+        self.assertEqual(ns.cmd, "approve")
+        self.assertEqual(ns.key, "LCN-2")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -52,7 +52,18 @@ def cmd_home(ns: argparse.Namespace) -> int:
 
 
 def cmd_keys(ns: argparse.Namespace) -> int:
-    return _show(KeysPort().view(cfg=_cfg(ns), fmt=_fmt(ns), full=_full(ns)))
+    try:
+        return _show(
+            KeysPort().view(
+                cfg=_cfg(ns),
+                fmt=_fmt(ns),
+                full=_full(ns),
+                recent=bool(getattr(ns, "recent", False)),
+                silent=False,
+            )
+        )
+    except Exception as exc:
+        return fail(str(exc))
 
 
 def cmd_start(ns: argparse.Namespace) -> int:
@@ -106,6 +117,20 @@ def cmd_step(ns: argparse.Namespace) -> int:
         return step(ns.key, repo, cfg)
     except BudgetExhausted as exc:
         return fail(str(exc), code=2)
+
+
+def cmd_approve(ns: argparse.Namespace) -> int:
+    from conductor import approve_spec, require_key
+    from paths import run_dir
+
+    key = require_key(ns.key)
+    run = run_dir(key)
+    try:
+        approve_spec(run, key)
+    except FileNotFoundError as exc:
+        return fail(str(exc), code=2)
+    print(f"dev-loop: spec approved for {key}")
+    return cmd_step(ns)
 
 
 def cmd_repos(ns: argparse.Namespace) -> int:
@@ -218,12 +243,17 @@ def cmd_agent_memory(ns: argparse.Namespace) -> int:
 
 
 def cmd_verify(ns: argparse.Namespace) -> int:
+    from treehouse import workspace_for_ticket
+
     cfg = _cfg(ns)
-    repo = Path(ns.repo).expanduser().resolve() if ns.repo else Path.cwd()
-    repo = require_repo(repo, cfg)
-    key = ns.key or load_state().get("ticket") or "LOCAL"
-    log = run_dir(str(key)) / "verify.log"
-    return run_verify(repo, cfg, log)
+    st = load_state()
+    key = ns.key or st.get("ticket") or "LOCAL"
+    repo_arg = Path(ns.repo).expanduser() if ns.repo else None
+    run = run_dir(str(key))
+    leased = (run / "lease.json").is_file()
+    repo = workspace_for_ticket(str(key), repo_arg, st)
+    repo = require_repo(repo, cfg, check_location=not leased)
+    return run_verify(repo, cfg, run / "verify.log")
 
 
 def cmd_status(ns: argparse.Namespace) -> int:
@@ -247,8 +277,16 @@ def cmd_progress(ns: argparse.Namespace) -> int:
 
 
 def cmd_infer(ns: argparse.Namespace) -> int:
+    from treehouse import workspace_for_ticket
+
     cfg = _cfg(ns)
-    repo = Path(ns.repo).expanduser().resolve() if ns.repo else Path.cwd()
+    st = load_state()
+    key = getattr(ns, "key", None) or st.get("ticket")
+    repo_arg = Path(ns.repo).expanduser() if ns.repo else None
+    if key:
+        repo = workspace_for_ticket(str(key), repo_arg, st)
+    else:
+        repo = (repo_arg or Path.cwd()).expanduser().resolve()
     r = infer_recipe(repo, cfg)
     if r is None:
         return fail("cannot infer", code=2)
@@ -290,13 +328,18 @@ def cmd_jira_progress(ns: argparse.Namespace) -> int:
 
     cfg = _cfg(ns)
     key = require_key(ns.key)
-    progress(cfg, key, ns.event, ns.comment or "")
+    result = progress(cfg, key, ns.event, ns.comment or "")
     return _show(
         emit(
             Document(
                 bin="cli.py",
                 description="jira workflow",
-                meta={"key": key, "event": ns.event},
+                meta={
+                    "key": key,
+                    "event": ns.event,
+                    "status": result.get("status") or "ok",
+                    "note": result.get("note") or "",
+                },
             ),
             fmt=_fmt(ns),
         )
@@ -304,86 +347,101 @@ def cmd_jira_progress(ns: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="dev-loop")
-    p.add_argument("--config", help="config.yaml path (or DEVLOOP_CONFIG)")
-    p.add_argument("--format", choices=["brief", "json"], default="brief", help="agent output (default brief)")
-    p.add_argument("--full", action="store_true", help="do not clip long fields")
+    g = argparse.ArgumentParser(add_help=False)
+    g.add_argument("--config", help="config.yaml path (or DEVLOOP_CONFIG)")
+    g.add_argument("--format", choices=["brief", "json"], default="brief", help="agent output (default brief)")
+    g.add_argument("--full", action="store_true", help="do not clip long fields")
+    # Same flags after the subcommand. SUPPRESS so subparser defaults do not
+    # overwrite values already set on the parent (`dev-loop --format json repos`).
+    after = argparse.ArgumentParser(add_help=False)
+    after.add_argument("--config")
+    after.add_argument("--format", choices=["brief", "json"], default=argparse.SUPPRESS)
+    after.add_argument("--full", action="store_true", default=argparse.SUPPRESS)
+    p = argparse.ArgumentParser(prog="dev-loop", parents=[g])
     sub = p.add_subparsers(dest="cmd", required=False)
 
-    s = sub.add_parser("keys", help="Open Jira keys (brief)")
+    def add(name: str, **kw: object) -> argparse.ArgumentParser:
+        return sub.add_parser(name, parents=[after], **kw)
+
+    s = add("keys", help="Open Jira keys (brief)")
+    s.add_argument("--recent", action="store_true", help="Ignore sprint JQL; last-updated in jira.project")
     s.set_defaults(func=cmd_keys)
 
-    s = sub.add_parser("start", help="Fetch issue, memory, launch spec grill")
+    s = add("start", help="Fetch issue, memory, launch spec grill")
     s.add_argument("key")
     s.add_argument("--repo")
     s.set_defaults(func=cmd_start)
 
-    s = sub.add_parser("continue", help="After spec approved: test-writer through PR (blocking unless agent=cursor)")
+    s = add("continue", help="After spec approved: test-writer through PR (blocking unless agent=cursor)")
     s.add_argument("key")
     s.add_argument("--repo")
     s.add_argument("--no-wait", action="store_true")
     s.set_defaults(func=cmd_continue)
 
-    s = sub.add_parser("step", help="Cursor: run the next incomplete stage and return (never polls)")
+    s = add("step", help="Cursor: run the next incomplete stage and return (never polls)")
     s.add_argument("key")
     s.add_argument("--repo")
     s.set_defaults(func=cmd_step)
 
-    s = sub.add_parser("fetch")
+    s = add("approve", help="Record spec approval (SPEC_APPROVED) and step once")
+    s.add_argument("key")
+    s.add_argument("--repo")
+    s.set_defaults(func=cmd_approve)
+
+    s = add("fetch")
     s.add_argument("key")
     s.set_defaults(func=cmd_fetch)
 
-    s = sub.add_parser("memory")
-
+    s = add("memory")
     s.add_argument("--repo")
     s.add_argument("--force", action="store_true")
     s.set_defaults(func=cmd_memory)
 
-    s = sub.add_parser("agent-memory", help="Apply verdict.metadata[] into AGENTS.md / path-scoped rules")
+    s = add("agent-memory", help="Apply verdict.metadata[] into AGENTS.md / path-scoped rules")
     s.add_argument("--repo", help="Target git repo (default: cwd)")
     s.add_argument("--verdict", help="Path to verdict.json")
     s.add_argument("--key", help="Ticket key; reads runs/KEY/verdict.json")
     s.set_defaults(func=cmd_agent_memory)
 
-    s = sub.add_parser("verify")
+    s = add("verify")
     s.add_argument("--repo")
     s.add_argument("--key")
     s.set_defaults(func=cmd_verify)
 
-    s = sub.add_parser("infer")
+    s = add("infer")
     s.add_argument("--repo")
     s.set_defaults(func=cmd_infer)
 
-    s = sub.add_parser("status")
+    s = add("status")
     s.set_defaults(func=cmd_status)
 
-    s = sub.add_parser("progress", help="Stage timeline (brief; --full for progress.md)")
+    s = add("progress", help="Stage timeline (brief; --full for progress.md)")
     s.add_argument("key", nargs="?")
     s.set_defaults(func=cmd_progress)
 
-    s = sub.add_parser("example-config")
+    s = add("example-config")
     s.set_defaults(func=cmd_print_example)
 
-    s = sub.add_parser("eval", help="Run configured keys through builtin adapters (test mode)")
+    s = add("eval", help="Run configured keys through builtin adapters (test mode)")
     s.add_argument("--repo")
     s.set_defaults(func=cmd_eval)
 
-    s = sub.add_parser("poll", help="Poll watched PRs (launchd). Not a skill, not MCP.")
+    s = add("poll", help="Poll watched PRs (launchd). Not a skill, not MCP.")
     s.set_defaults(func=cmd_poll)
 
-    s = sub.add_parser("install-poller", help="Write LaunchAgent plist; load only if poller.enabled")
+    s = add("install-poller", help="Write LaunchAgent plist; load only if poller.enabled")
     s.add_argument("--load", action="store_true", default=None)
     s.add_argument("--no-load", action="store_false", dest="load")
     s.set_defaults(func=cmd_install_poller)
 
-    s = sub.add_parser("repos", help="Candidate repos (brief; --format json for the picker)")
+    s = add("repos", help="Candidate repos (brief; --format json for the picker)")
     s.set_defaults(func=cmd_repos)
 
-    s = sub.add_parser("init-repo", help="Create a new git repo under ~/dev (optional gh create)")
+    s = add("init-repo", help="Create a new git repo under ~/dev (optional gh create)")
     s.add_argument("name")
     s.set_defaults(func=cmd_init_repo)
 
-    s = sub.add_parser("jira-progress", help="Transition/comment a Jira issue by workflow event name")
+    s = add("jira-progress", help="Transition/comment a Jira issue by workflow event name")
     s.add_argument("key")
     s.add_argument("--event", default="on_start", choices=["on_start", "on_pr", "on_merge", "on_block", "on_waiting"])
     s.add_argument("--comment", default="")

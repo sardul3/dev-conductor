@@ -39,7 +39,7 @@ dev-loop start PROJ-123 --repo /path/to/repo
 Config: `~/.config/dev-conductor/dev-loop/config.yaml`  
 Secrets: `~/.config/dev-conductor/secrets.env` (`ATLASSIAN_*`). Never commit.
 
-Isolation: `git.isolation: worktree` (default) uses native `git worktree` under `.{repo}-worktrees/{KEY}`. `treehouse` remains opt-in. Eval uses `none`. Concurrent tickets: `queue.max_active: 3`.
+Isolation: `git.isolation: worktree` (default) uses native `git worktree` under `{repo}-worktrees/{KEY}` (visible sibling of the clone). `treehouse` remains opt-in. Eval uses `none`. Concurrent tickets: `queue.max_active: 3`.
 
 Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml eval --repo /path/to/lab-repo`
 

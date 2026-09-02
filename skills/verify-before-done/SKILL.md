@@ -18,6 +18,6 @@ State the command, run it, read the output, then claim. If it failed, say it fai
 
 ## `/dev-loop`
 
-- **Writer / test-writer / rewrite:** run the inferred test command before `STAGE_DONE`. Infer it from manifests, not from memory of another repo.
-- **Verify stage:** in-process CLI writes `verify.log`. Do not skip `step` and claim verify yourself. Do not open a PR (`finish-branch` is not ship).
+- **Writer / test-writer / rewrite:** run the inferred test command before `STAGE_DONE`. Infer it from manifests, not from memory of another repo. After green, write terminal snapshots (`tests.png`, `run.png`, `curl.png` as applicable) to `~/.config/dev-conductor/dev-loop/runs/KEY/evidence/` before `STAGE_DONE`. Browser screenshot, macOS `screencapture`, or a PNG of the terminal. Text-only `verify.log` is not enough.
+- **Verify stage:** in-process CLI writes `verify.log`. Do not skip `step` and claim verify yourself. Do not open a PR (`finish-branch` is not ship). If snapshots are still missing after verify is green, capture them **before** `step` ship — ship refuses without them when `evidence.require_visual` (default true).
 - Red verify → writer retry via `step`. Debug with `systematic-debugging`; do not weaken tests except compile/syntax/simple IO or a spec contradiction.

@@ -25,11 +25,26 @@ python3 ~/.claude/hooks/dev-loop/cli.py step KEY
 
 Run dir: `~/.config/dev-conductor/dev-loop/runs/KEY/`.
 
+## What to test
+
+**Public seams** are observable product behavior: HTTP routes, exported functions, the **app** CLI (`python -m pkg`), events. Scaffolding / greenfield tickets: test the **app stub** (importable package, greeting on stdout), not the toolchain.
+
+**Forbidden as test subjects** (README + conductor `cli.py verify`, not pytest):
+
+- package-manager sync (`uv sync`, `npm install`)
+- nested test runners (`uv run pytest`, `pytest`, `npm test`, `go test ./...`) — deadlock
+- linters / typecheckers (`ruff`, `pyright`, `eslint`)
+- lockfile existence, `requires-python`, “does pytest/ruff exit 0”
+- toolchain install
+- README command lists
+
+Never spawn `uv run pytest` or `pytest` from a test. Never `git add` `__pycache__` or `.venv`. New Python repo: add a standard `.gitignore`.
+
 ## Procedure
 
-1. Read spec seams. Each case in **Acceptance** becomes one (or one parameterized) test whose name reads like the spec.
-2. Infer the test command from manifests (pytest, `./mvnw test`, `npm test`, `go test`). Do not invent a second runner.
-3. Write tests that call **only listed seams**. Prefer one vertical slice (the story’s primary behavior). Extra cases only if the spec names them.
+1. Read spec seams. Skip verify/README gates (uv/ruff/pyright/pytest-exits-0). Each remaining **product** case becomes one (or one parameterized) test whose name reads like the spec.
+2. Infer the test command from manifests so you can **run the suite once**. Do not assert that command from inside a test.
+3. Write tests that call **only product seams**. Prefer one vertical slice (the story’s primary behavior). Extra cases only if the spec names product behavior.
 4. Cover named error/edge paths as behavioral tests, not line-coverage theatre.
 5. Run the test command once. Confirm failures are assertion/behavior failures (red for the right reason), not missing imports you can fix in the test file.
 6. Do not implement production code. Do not mock the unit under test into emptiness (a fake that always returns `"ok"` is not a test).

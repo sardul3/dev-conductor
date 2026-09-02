@@ -76,16 +76,30 @@ jira:
 runtime:
   agent: cursor             # one-stage step; never polls 24h
 git:
-  isolation: worktree       # default
+  isolation: worktree       # {repo}-worktrees/{KEY} next to the clone (no leading dot)
   require_github_remote: true
+workflow:
+  enabled: true             # default; eval turns this off
+  assign_on_start: true     # assign you when the ticket is unassigned
 dev_root: ~/dev             # start --repo must live here unless allow_outside_dev
 ```
 
-`cli.py keys` only lists issues matching `assignee = currentUser() AND sprint in openSprints() AND statusCategory != Done`. Other tickets still work with `dev-loop start KEY --repo PATH`.
+`dev-loop keys` lists `assignee = currentUser() AND sprint in openSprints() AND statusCategory != Done`. If that is empty, `dev-loop keys --recent --format json`. Other tickets still work with `dev-loop start KEY --repo PATH`.
+
+Verify infers `uv run pytest` for uv projects (`uv.lock` or `[tool.uv]`).
 
 ## 4. Daily loop
 
-The repo you pass to `--repo` must be a **git clone with a GitHub remote**, under `~/dev`. A folder with no `origin` will exit: `no GitHub remote`.
+The repo you pass to `--repo` must be a **git clone with a GitHub remote**, under `~/dev`. A folder with no `origin` will exit: `no GitHub remote`. Isolation worktrees are `{repo}-worktrees/{KEY}` (visible sibling of the clone). After `start`/`step`, Cursor must `move_agent_to_root` to the printed `workspace`.
+
+If KEY or `--repo` is missing, fetch JSON and pick with **AskQuestion** (never paste CLI `--help`):
+
+```bash
+dev-loop keys --format json
+# if count is 0:
+dev-loop keys --recent --format json
+dev-loop repos --format json
+```
 
 ```bash
 # Agent chat
@@ -96,26 +110,30 @@ dev-loop start KEY --repo ~/dev/your-clone
 dl start KEY --repo ~/dev/your-clone
 ```
 
-1. Grill the spec **in that chat** (`story-spec`). Do not implement yet.
-2. When you accept the spec (not the ticket), the agent writes `SPEC_APPROVED` then:
+1. Grill the spec **in that chat** with AskQuestion (`story-spec`). Do not implement yet.
+2. When you accept the spec (not the ticket):
 
    ```bash
-   dev-loop step KEY
+   dev-loop approve KEY
    ```
 
-3. Each `step` is **one** stage (test-writer → writer → verify → review → ship). Write `STAGE_DONE` / `SESSION_DONE`, then `step` again.
-4. Test-writer: spawn a **new Agent**. Parent chat does not Read implementation trees.
+   That records `SPEC_APPROVED` and advances one stage. Do not write handshake files by hand.
+
+3. Each later `step` is **one** stage (test-writer → writer → verify → review → ship). Write `STAGE_DONE` / `SESSION_DONE`, then `step` again.
+4. Test-writer: spawn a **new Agent**. Parent chat does not Read implementation trees. Do not test the toolchain (`uv`, `pytest`, `ruff`) from inside pytest.
 
 Handshake files: `~/.config/dev-conductor/dev-loop/runs/KEY/`.
 
 `dev-loop continue KEY` with `runtime.agent: cursor` is the same as `step`. Do not use `continue --no-wait`.
+
+`start` assigns you when the ticket is unassigned. The Jira progress comment includes the GitHub PR URL.
 
 ## 5. What install does not do
 
 - Create `secrets.env` or log you into `gh`.
 - Clone your product repo or add a GitHub remote.
 - Sync `~/.cursor/skills` or `~/.config/dev-conductor` to another laptop (re-run the installer there after `git pull`).
-- Open a PR; ship is `dev-loop step` after review.
+- Open a PR; ship is `dev-loop step` after review. PR body: Jira browse link, concrete test commands, visual evidence (backend: terminal snapshots in `runs/KEY/evidence/`) — no spec dump.
 
 ## 6. Re-install / other machine
 

@@ -5,7 +5,7 @@ description: Staff review for a /dev-loop ticket. Spawn code-reviewer on the git
 
 # Dev-loop review
 
-The CLI decides rewrite vs ship from `verdict.json`. An honest `needs_improvement` is useful; a rubber `good` ships bugs. After the rewrite cap, **the CLI** still ships and puts risks in the PR body — you do not.
+The CLI decides rewrite vs ship from `verdict.json`. An honest `needs_improvement` is useful; a rubber `good` ships bugs. After the rewrite cap, **the CLI** still ships and puts risks in the PR body — you do not. PR body is CLI-owned (Jira browse link, recipe commands, visual evidence from `runs/KEY/evidence/`; no spec excerpt). Verdict is a one-liner. Confirm snapshots exist before the ship step; do not open a PR.
 
 ## Who runs this
 

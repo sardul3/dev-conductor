@@ -22,7 +22,7 @@ Do not paste `/dev-loop` skill bodies into `AGENTS.md`. Handshake and “no Jira
 
 ## Work vs grill
 
-- Grill / enrich / `story-spec`: full sentences, numbered questions. No terse contract.
+- Grill / enrich / `story-spec`: full sentences. Cursor Agent: **AskQuestion** (recommended first, ≤4 options). Claude enrich: `AskUserQuestion` or numbered markdown. No terse contract.
 - Work session (launched `claude --model`, or `/dev-loop` writer): short contract in the **prompt**, plus `PROMPT_ENRICH_WORK_SESSION=1` on Claude. Depth words (`thorough`, `walk me through`, `tutorial`) back the hook off.
 
 Do not install an always-on “be brief” skill. That fights interviews. Pattern from [denfry/claude-skills token-efficiency](https://github.com/denfry/claude-skills) (measured shorter replies); we scoped it to the work session only.

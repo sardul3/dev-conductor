@@ -11,6 +11,14 @@ from gitutil import denylisted, is_git_repo
 from ship import slugify
 
 CREATE_ID = "__create__"
+PYTHON_GITIGNORE = [
+    ".venv/",
+    "__pycache__/",
+    "*.pyc",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    ".mypy_cache/",
+]
 DEFAULT_SKIP = [
     "node_modules",
     ".git",

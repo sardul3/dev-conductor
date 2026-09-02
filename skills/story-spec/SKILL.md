@@ -7,7 +7,7 @@ description: Turn a Jira story into spec.md (seams, Given/When/Then, non-goals) 
 
 This is the **requirements lock** for `/dev-loop`. `test-writer` may only test the seams you write here. Vague seams produce either no tests or tests that spy on internals.
 
-Stay in **this chat**. Do not run `launch-clean-claude.sh`. Do not follow `prompt-contract` handoff (that starts an implement session). For how to ask questions, load `design-tree-interview` and use **spec mode** (empty frontier → write `spec.md`, stop).
+Stay in **this chat**. Do not run `launch-clean-claude.sh`. Do not follow `prompt-contract` handoff (that starts an implement session). For how to ask questions, load `design-tree-interview` and use **spec mode** (Cursor **AskQuestion**, empty frontier → write `spec.md`, stop).
 
 ## Inputs
 
@@ -18,17 +18,17 @@ Repo memory (skip Explore if HASH is fresh): `~/.config/dev-conductor/dev-loop/m
 ## Procedure
 
 1. Read `issue.md` (or the Jira markdown in the prompt) and memory files.
-2. Grill with `design-tree-interview` **spec mode**. Facts (existing routes, OpenAPI, test command) → look up. Product choices → ask, with a recommended answer each time.
-3. Lock **seams** (public APIs to test), acceptance cases, non-goals, and data shape. Do not design class internals.
+2. Grill with `design-tree-interview` **spec mode** via Cursor **AskQuestion** (recommended option first, label ends with `(Recommended)`, ≤4 options). Facts (existing routes, OpenAPI, test command) → look up. Product choices → ask. Do not use markdown `❓ Q1` in Agent chat.
+3. Lock **seams** (public APIs to test), acceptance cases, non-goals, and data shape. Do not design class internals. Cases that are “run ruff / pytest / uv sync” or “lockfile exists” are verify gates (`cli.py verify` + README), not seams — seams are product behavior (HTTP, exported function, app CLI). Scaffolding / greenfield Python tickets: include `.gitignore` as a seam (standard Python ignores) so writers do not leave `__pycache__` trackable — that is a file to add, not a pytest subject.
 4. Write `spec.md` in the run dir using the template below.
-5. Ask the user to approve **the spec** (AskQuestion). `SPEC_APPROVED` means the spec is accepted, not that the ticket is done.
-6. **Only after they say yes:** write `SPEC_APPROVED`, `APPROVED`, `SESSION_DONE`, and `STAGE_DONE` in the run dir, then:
+5. Ask the user to approve **the spec** with AskQuestion (`Approve spec` / `Revise`). That is the only human gate. Do not ask again, and do not narrate handshake files.
+6. **Only after they say yes:**
 
 ```bash
-python3 ~/.claude/hooks/dev-loop/cli.py step KEY
+dev-loop approve KEY
 ```
 
-If they reject, revise `spec.md` and ask again. Never write `SPEC_APPROVED` because `spec.md` exists.
+That writes `SPEC_APPROVED` in the run dir and steps to test-writer. Do not `touch` `SPEC_APPROVED`, `APPROVED`, `STAGE_DONE`, or `SESSION_DONE` yourself (wrong folder is why `step` used to say “spec not approved”). If they reject, revise `spec.md` and ask again. Never approve because `spec.md` exists.
 
 Do not write application code. Do not git commit. Do not open a PR. Do not invent `AGENTS.md` / rules here (`agent-memory` after review).
 

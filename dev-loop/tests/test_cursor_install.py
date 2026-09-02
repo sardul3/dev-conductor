@@ -26,8 +26,29 @@ class CursorInstallTests(unittest.TestCase):
         self.assertIn("agent: cursor", text)
         cmd = (ROOT / "cursor" / "commands" / "dev-loop.md").read_text(encoding="utf-8")
         self.assertIn("name: dev-loop", cmd)
+        self.assertIn("AskQuestion", cmd)
+        self.assertIn("keys --recent", cmd)
+        self.assertIn("approve KEY", cmd)
+        self.assertIn("move_agent_to_root", cmd)
+        skill = (ROOT / "skills" / "dev-loop" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("move_agent_to_root", skill)
+        self.assertIn("/browse/", skill)
+        self.assertIn("Jira:", skill)
+        self.assertIn("Evidence", skill)
+        self.assertNotIn("## Spec (excerpt)", skill)
+        self.assertIn("no spec excerpt", skill.lower())
         wrapper = ROOT / "dev-loop" / "bin" / "dev-loop"
         self.assertTrue(wrapper.is_file())
+
+    def test_given_test_writer_skill_when_read_then_forbids_toolchain_as_subject(self) -> None:
+        skill = (ROOT / "skills" / "test-writer" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Forbidden as test subjects", skill)
+        self.assertIn("nested test runners", skill)
+        self.assertIn("Never spawn", skill)
+        self.assertIn("uv run pytest", skill)
+        self.assertIn("cli.py verify", skill)
+        self.assertIn("__pycache__", skill)
+        self.assertIn(".gitignore", skill)
 
     def test_given_existing_hooks_when_merge_then_keeps_other_commands(self) -> None:
         sys.path.insert(0, str(ROOT / "cursor" / "dev-loop"))

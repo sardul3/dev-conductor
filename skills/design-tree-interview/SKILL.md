@@ -9,7 +9,19 @@ Treat the work as a **design tree**: each decision unlocks the decisions that de
 
 ## Rounds
 
-The **frontier** is every question whose prerequisites are already settled. Ask the **whole frontier** in one round. Number each item. Give **your recommended answer** every time. Then wait.
+The **frontier** is every question whose prerequisites are already settled. Ask the **whole frontier** in one round. Then wait.
+
+### Cursor (spec, `/dev-loop`, ad-hoc grill in Agent chat)
+
+Use the **AskQuestion** tool — never markdown `❓ Q1` in the user-visible reply. One AskQuestion call may include several questions.
+
+- Recommended answer = **first** option; end that label with `(Recommended)`.
+- At most **4** options per question (Cursor adds Other).
+- Do not paste CLI `--help`, argparse usage, or raw stderr.
+
+### Claude Code enrich
+
+`AskUserQuestion` allows **at most 4 options** per question; otherwise numbered markdown:
 
 ```
 ❓ **Q1** - **<title>**: <body, choices if useful>
@@ -28,7 +40,7 @@ After answers, recompute the frontier. A question that still depends on an open 
 
 **A — `/dev-loop` spec** (prompt loaded `story-spec`, or run dir has `issue.md`):
 
-Empty frontier → write `spec.md` per `story-spec`. Stop. Do **not** implement, `session-handoff`, or `launch-clean-claude.sh`. The user still has to approve the spec.
+Empty frontier → write `spec.md` per `story-spec`. Stop. Do **not** implement, `session-handoff`, or `launch-clean-claude.sh`. The user still has to approve the spec (AskQuestion).
 
 **B — Cursor ad-hoc grill** (user asked to grill a plan, not a ticket):
 
@@ -37,8 +49,6 @@ Empty frontier → `session-handoff` into `~/.config/dev-conductor/handoffs/`. S
 **C — Claude prompt-enrich** (injected enrich session; no Glob/Grep/Explore/Agent):
 
 For facts, **Read only** cwd `README.md`, `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `composer.json`. Infer stack from those.
-
-`AskUserQuestion` allows **at most 4 options** per question; otherwise numbered markdown.
 
 Empty frontier → fill remaining prompt-contract slots, `session-handoff` via `save_handoff.py` (never Write `/tmp`), `launch-clean-claude.sh --file <path>`. Stop after launch. Do not implement in this tab.
 

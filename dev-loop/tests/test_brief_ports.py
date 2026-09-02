@@ -47,6 +47,19 @@ class BriefPortTests(unittest.TestCase):
             self.assertIn("now: writer / ok", text)
             self.assertIn("events[", text)
 
+    def test_given_lease_when_progress_then_workspace_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            run = Path(td)
+            record(run, "spec", "waiting_approval")
+            (run / "lease.json").write_text(
+                json.dumps({"kind": "worktree", "path": "/tmp/langchain-worktrees/LCN-2"}) + "\n",
+                encoding="utf-8",
+            )
+            text = ProgressPort().view(key="LCN-2", run=run)
+            self.assertIn("workspace: /tmp/langchain-worktrees/LCN-2", text)
+            data = json.loads(ProgressPort().view(key="LCN-2", run=run, fmt="json"))
+            self.assertEqual(data["meta"]["workspace"], "/tmp/langchain-worktrees/LCN-2")
+
     def test_given_recipe_when_infer_then_cmds(self) -> None:
         recipe = SimpleNamespace(test=["pytest"], build=["true"], health="")
         text = InferPort().view(recipe=recipe)
@@ -81,6 +94,58 @@ class BriefPortTests(unittest.TestCase):
         data = json.loads(KeysPort().view(keys=["A-1"], fmt="json"))
         self.assertEqual(data["count"], 1)
         self.assertEqual(data["tables"]["tickets"][0]["key"], "A-1")
+
+    def test_given_recent_when_fetch_then_skips_cache_and_uses_project_jql(self) -> None:
+        from unittest.mock import patch
+
+        cfg = SimpleNamespace(
+            jql="sprint in openSprints()",
+            jira=SimpleNamespace(project="LCN", max_keys=15, search_path="/s", timeout_sec=10),
+            session_start=SimpleNamespace(cache_minutes=10, keys_limit=15),
+        )
+        with (
+            patch("session_start.cached_keys") as cached,
+            patch("session_start.store_keys") as store,
+            patch("jira_client.search_keys", return_value=["LCN-2", "LCN-1"]) as search,
+            patch("config.jira_creds", return_value=("b", "e", "t")),
+        ):
+            data = KeysPort().fetch(cfg=cfg, recent=True)
+        cached.assert_not_called()
+        store.assert_not_called()
+        self.assertEqual(search.call_args.args[3], "project = LCN ORDER BY updated DESC")
+        self.assertEqual(data["tickets"][0]["key"], "LCN-2")
+        self.assertEqual(data["total"], 2)
+
+    def test_given_silent_false_when_jira_fails_then_raises(self) -> None:
+        from unittest.mock import patch
+
+        cfg = SimpleNamespace(
+            jql="x",
+            jira=SimpleNamespace(project="LCN", max_keys=15, search_path="/s", timeout_sec=10),
+            session_start=SimpleNamespace(cache_minutes=10, keys_limit=15),
+        )
+        with (
+            patch("session_start.cached_keys", return_value=None),
+            patch("config.jira_creds", side_effect=RuntimeError("missing token")),
+        ):
+            with self.assertRaises(RuntimeError):
+                KeysPort().fetch(cfg=cfg, silent=False)
+
+    def test_given_silent_true_when_jira_fails_then_empty(self) -> None:
+        from unittest.mock import patch
+
+        cfg = SimpleNamespace(
+            jql="x",
+            jira=SimpleNamespace(project="LCN", max_keys=15, search_path="/s", timeout_sec=10),
+            session_start=SimpleNamespace(cache_minutes=10, keys_limit=15),
+        )
+        with (
+            patch("session_start.cached_keys", return_value=None),
+            patch("config.jira_creds", side_effect=RuntimeError("missing token")),
+        ):
+            data = KeysPort().fetch(cfg=cfg, silent=True)
+        self.assertEqual(data["tickets"], [])
+        self.assertEqual(data["total"], 0)
 
 
 if __name__ == "__main__":

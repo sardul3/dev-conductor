@@ -113,20 +113,19 @@ PROGRESS_TO_LAUNCH = {v: k for k, v in LAUNCH_TO_PROGRESS.items()}
 
 def step(key: str, repo: Path | None, cfg: DevLoopConfig) -> int:
     import json
-    import os
 
     from conductor import launch_prompt, require_key, require_repo, _clear_stage_done
     from lavish import decide_lavish
     from memory import load_or_build
     from paths import run_dir
     from prompts import review_prompt, simplify_prompt, test_writer_prompt, writer_prompt
-    from ship import ensure_feature_branch, pr_body, ship_work
+    from ship import ensure_feature_branch, pr_body, pr_body_inputs, ship_work
     from state import load_state, update_state
     from touched import changed_since, load_snapshot, save_snapshot, snapshot_tree
-    from treehouse import workspace_for_run
+    from treehouse import workspace_for_ticket, workspace_notice
     from verify_infer import run_verify
     from evidence import capture_evidence
-    from jira_workflow import progress as jira_progress
+    from jira_workflow import pr_comment_text, progress as jira_progress
     from watch import add_watch
     from gitutil import current_branch, default_branch, run_git
 
@@ -142,10 +141,11 @@ def step(key: str, repo: Path | None, cfg: DevLoopConfig) -> int:
         print(f"dev-loop: spec not approved — see {run / 'progress.md'}")
         return 2
 
-    origin = Path(repo or st.get("origin_repo") or st.get("repo") or os.getcwd())
     leased = (run / "lease.json").is_file()
-    repo_path = workspace_for_run(run, origin)
+    repo_path = workspace_for_ticket(key, repo, st)
     repo_path = require_repo(repo_path, cfg, check_location=not leased)
+    origin = Path(st.get("origin_repo") or st.get("repo") or repo_path)
+    print(workspace_notice(repo_path))
 
     if consumed == "review":
         _record_memory(cfg, repo_path, run, key)
@@ -228,10 +228,13 @@ def step(key: str, repo: Path | None, cfg: DevLoopConfig) -> int:
             except json.JSONDecodeError:
                 pass
         evidence_md = (run / "evidence.md").read_text(encoding="utf-8") if (run / "evidence.md").is_file() else ""
-        body = pr_body(key, summary, spec, verdict, True, evidence=evidence_md)
+        extras = pr_body_inputs(cfg, repo_path, run)
+        body = pr_body(key, summary, spec, verdict, True, evidence=evidence_md, **extras)
         (run / "pr.md").write_text(body, encoding="utf-8")
         try:
-            prs = ship_work(repo_path, rels, key, summary, spec, verdict, cfg, evidence=evidence_md)
+            prs = ship_work(
+                repo_path, rels, key, summary, spec, verdict, cfg, evidence=evidence_md, run=run, **extras
+            )
         except Exception as exc:  # noqa: BLE001
             update_state(stage="ship-failed", error=str(exc), ticket=key)
             print(f"dev-loop: ship failed: {exc}")
@@ -251,7 +254,7 @@ def step(key: str, repo: Path | None, cfg: DevLoopConfig) -> int:
         last = prs[-1] if prs else None
         update_state(stage="shipped", pr_number=last, pr_numbers=prs, branch=branch, ticket=key)
         if last:
-            jira_progress(cfg, key, "on_pr", f"PR #{last} opened on {branch}")
+            jira_progress(cfg, key, "on_pr", pr_comment_text(cfg, last, branch, repo=repo_path))
             record(run, "ship", "pr", ticket=key, note=f"#{last} {branch}")
             print(f"dev-loop: PR #{last} on {branch}")
         else:

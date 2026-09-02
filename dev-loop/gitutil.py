@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -31,6 +32,31 @@ def github_remote(repo: Path) -> str | None:
             if len(parts) >= 2:
                 return parts[1]
     return None
+
+
+def github_https_repo(remote: str | None) -> str:
+    raw = (remote or "").strip()
+    if not raw:
+        return ""
+    m = re.search(r"github\.com[:/]([^/]+)/([^/\s]+)", raw, re.I)
+    if not m:
+        return ""
+    owner, name = m.group(1), m.group(2)
+    if name.endswith(".git"):
+        name = name[:-4]
+    name = name.rstrip("/")
+    if not owner or not name:
+        return ""
+    return f"https://github.com/{owner}/{name}"
+
+
+def github_pr_url(remote: str | None, number: int | None) -> str:
+    if number is None:
+        return ""
+    base = github_https_repo(remote)
+    if not base:
+        return ""
+    return f"{base}/pull/{int(number)}"
 
 
 def default_branch(repo: Path) -> str:
