@@ -176,6 +176,16 @@ lavish:
   #   payments-api: off
   #   design-system: on
 
+# Arch Studio: optional architecture pack between spec grill and spec approve.
+# auto = on when the Jira ticket or repo looks like integration / architecture work.
+arch_studio:
+  enabled: auto
+  require_review: true
+  repos: {}
+  # repos:
+  #   payments-api: on
+  #   tiny-cli: off
+
 poller:
   enabled: false
   interval_minutes: 30

@@ -113,6 +113,9 @@ evidence:
 lavish:
   enabled: off
 
+arch_studio:
+  enabled: off
+
 poller:
   enabled: false
   interval_minutes: 30

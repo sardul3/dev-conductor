@@ -137,6 +137,7 @@ Never claim that a diagram proves deployed reality. State whether the model is u
 
 ## Additional resources
 
+- [references/dev-loop.md](references/dev-loop.md): `/dev-loop` spec-stage review in Cursor chat.
 - [references/installation.md](references/installation.md): install and first-run guidance.
 - [references/architecture-model.md](references/architecture-model.md): canonical fields, stable IDs, evidence, views, and placements.
 - [references/discovery-grill.md](references/discovery-grill.md): `design-tree-interview` prompt contract and completeness gate.

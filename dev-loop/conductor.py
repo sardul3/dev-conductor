@@ -26,6 +26,7 @@ from progress import backfill, record
 from treehouse import prepare_workspace, release_lease, workspace_for_ticket, workspace_notice
 from budget import BudgetExhausted, check_and_charge, check_budget, counts_against_budget, remaining_session_usd, stop_run
 from lavish import decide_lavish
+from arch_studio_bridge import decide_arch_studio, write_manifest
 
 ISSUE_KEY = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
 
@@ -150,6 +151,13 @@ def approve_spec(run: Path, key: str = "") -> None:
     """Record the human spec gate. Does not write STAGE_DONE (that is later stages)."""
     if not (run / "spec.md").is_file():
         raise FileNotFoundError(f"dev-loop: write spec.md before approve — {run / 'spec.md'}")
+    from arch_studio_bridge import arch_is_approved, arch_review_required
+
+    if arch_review_required(run) and not arch_is_approved(run):
+        raise FileNotFoundError(
+            f"dev-loop: architecture review required — open {run / 'architecture' / 'review.html'}, "
+            f"then `dev-loop arch approve {key or run.name}` before `dev-loop approve`"
+        )
     ticket = key or run.name
     (run / "SPEC_APPROVED").write_text("spec approved\n", encoding="utf-8")
     if not (run / "APPROVED").is_file():
@@ -209,8 +217,10 @@ def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
         json.dumps({"enabled": lv.enabled, "reason": lv.reason}, indent=2) + "\n",
         encoding="utf-8",
     )
+    arch = decide_arch_studio(cfg, origin, issue)
+    write_manifest(run, arch)
     if cfg.stages_enabled.get("spec", True):
-        prompt = spec_prompt(key, run, repo, issue_markdown(issue), lavish=lv.enabled)
+        prompt = spec_prompt(key, run, repo, issue_markdown(issue), lavish=lv.enabled, arch=arch.enabled)
         launch_prompt(prompt, repo, run, "spec", cfg)
         _maybe_adapter("spec", key, repo, run, cfg, issue=issue)
     if cfg.spec_auto_approve:
@@ -224,6 +234,11 @@ def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
         record(run, "spec", "waiting_approval", ticket=key, artifact="spec.md", note="human gate — spec, not the whole ticket")
         print(f"dev-loop: spec waiting approval. Read `{run / 'progress.md'}`.")
         print(f"Accept: `dev-loop approve {key}` after the spec AskQuestion")
+        if arch.enabled:
+            print(
+                f"Architecture: build under `{run / 'architecture'}` — see arch_studio.json; "
+                f"`dev-loop arch approve {key}` before spec approve when require_review is on"
+            )
     if cfg.runtime.auto_continue and spec_is_approved(run):
         continue_loop(key, repo, cfg, wait=not cfg.runtime.no_launch)
 

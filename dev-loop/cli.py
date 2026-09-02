@@ -133,6 +133,56 @@ def cmd_approve(ns: argparse.Namespace) -> int:
     return cmd_step(ns)
 
 
+def cmd_arch_approve(ns: argparse.Namespace) -> int:
+    from arch_studio_bridge import approve_arch
+    from conductor import require_key
+    from paths import run_dir
+
+    key = require_key(ns.key)
+    run = run_dir(key)
+    try:
+        approve_arch(run, key)
+    except FileNotFoundError as exc:
+        return fail(str(exc), code=2)
+    print(f"dev-loop: architecture approved for {key}")
+    return 0
+
+
+def cmd_arch_reject(ns: argparse.Namespace) -> int:
+    from arch_studio_bridge import reject_arch
+    from conductor import require_key
+    from paths import run_dir
+
+    key = require_key(ns.key)
+    run = run_dir(key)
+    reject_arch(run, key, note=str(getattr(ns, "note", "") or ""))
+    print(f"dev-loop: architecture rejected for {key}")
+    return 0
+
+
+def cmd_arch_status(ns: argparse.Namespace) -> int:
+    from arch_studio_bridge import arch_status
+    from conductor import require_key
+    from paths import run_dir
+
+    key = require_key(ns.key)
+    payload = arch_status(run_dir(key))
+    if _fmt(ns) == "json":
+        print(json.dumps(payload, indent=2))
+        return 0
+    lines = [
+        f"enabled: {payload['enabled']}",
+        f"require_review: {payload['require_review']}",
+        f"approved: {payload['approved']}",
+        f"reason: {payload['reason'] or '-'}",
+    ]
+    if payload.get("review_html"):
+        lines.append(f"review_html: {payload['review_html']}")
+    if payload.get("output_dir"):
+        lines.append(f"output_dir: {payload['output_dir']}")
+    return _show("\n".join(lines) + "\n")
+
+
 def cmd_repos(ns: argparse.Namespace) -> int:
     from pick import candidates_payload
 
@@ -387,6 +437,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("key")
     s.add_argument("--repo")
     s.set_defaults(func=cmd_approve)
+
+    arch = sub.add_parser("arch", help="Architecture pack review gate (Arch Studio)", parents=[after])
+    arch_sub = arch.add_subparsers(dest="arch_cmd", required=True)
+    s = arch_sub.add_parser("approve", help="Record ARCH_APPROVED after in-chat review")
+    s.add_argument("key")
+    s.set_defaults(func=cmd_arch_approve)
+    s = arch_sub.add_parser("reject", help="Clear ARCH_APPROVED and record rejection")
+    s.add_argument("key")
+    s.add_argument("--note", default="", help="Reviewer note for review-decisions.json")
+    s.set_defaults(func=cmd_arch_reject)
+    s = arch_sub.add_parser("status", help="Show architecture review paths and gate state")
+    s.add_argument("key")
+    s.set_defaults(func=cmd_arch_status)
 
     s = add("fetch")
     s.add_argument("key")

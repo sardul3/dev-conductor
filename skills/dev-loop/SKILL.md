@@ -37,6 +37,8 @@ Then `$CLI start KEY --repo PATH`. If cwd is already that **git** repo, `$CLI st
 
 Grill in this chat (`story-spec`) with **AskQuestion** (recommended option first). On **user yes**, `$CLI approve KEY` (writes `SPEC_APPROVED` and steps once). Do not write four handshake files.
 
+When `arch_studio.json` has `enabled: true`, build the architecture pack after `spec.md`, open `architecture/review.html` with Cursor `open_resource`, run the in-chat approve/reject gate (`$CLI arch approve KEY` / `$CLI arch reject KEY`), then the spec AskQuestion and `$CLI approve KEY`.
+
 | Runtime | Command |
 | ------- | ------- |
 | Cursor (`runtime.agent: cursor`) | `$CLI step KEY` — one stage, return |

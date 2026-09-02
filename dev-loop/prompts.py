@@ -6,16 +6,23 @@ from pathlib import Path
 SKIP = "<!-- PROMPT_CONTRACT_V1 -->"
 
 
-def spec_prompt(key: str, run: Path, repo: Path, issue_md: str, *, lavish: bool = False) -> str:
+def spec_prompt(key: str, run: Path, repo: Path, issue_md: str, *, lavish: bool = False, arch: bool = False) -> str:
     extra = (
         "Load skill `lavish-ui`. This repo is UI (`lavish.enabled` resolved on). "
         "Keep Jira AC in `spec.md`. HTML is collaboration, not the contract.\n"
         if lavish else ""
     )
+    arch_extra = (
+        "Load skill `arch-studio` and `references/dev-loop.md`. `arch_studio.json` is enabled. "
+        f"After `spec.md`, build the architecture pack under `{run / 'architecture'}`, open "
+        f"`review.html` with Cursor `open_resource`, run the in-chat approve/reject gate "
+        f"(`dev-loop arch approve {key}` / `dev-loop arch reject {key}`), then ask to approve the spec.\n"
+        if arch else ""
+    )
     return (
         f"Load skill `story-spec`. Ticket `{key}`.\n"
         f"Repo: `{repo}`\n"
-        f"{extra}"
+        f"{extra}{arch_extra}"
         f"Grill with Cursor AskQuestion: recommended choice first (label ends with (Recommended)), "
         f"at most 4 options per question, whole frontier in one AskQuestion call. "
         f"Do not paste CLI --help or argparse usage into chat.\n"

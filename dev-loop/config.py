@@ -231,6 +231,18 @@ class LavishCfg:
 
 
 @dataclass
+class ArchStudioCfg:
+    # auto = on for integration/architecture tickets or IaC-heavy repos. on | off | auto.
+    enabled: str = "auto"
+    require_review: bool = True
+    repos: dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.repos is None:
+            self.repos = {}
+
+
+@dataclass
 class PollerCfg:
     enabled: bool = False
     interval_minutes: int = 30
@@ -299,6 +311,7 @@ class DevLoopConfig:
     quality: QualityCfg = field(default_factory=QualityCfg)
     evidence: EvidenceCfg = field(default_factory=EvidenceCfg)
     lavish: LavishCfg = field(default_factory=LavishCfg)
+    arch_studio: ArchStudioCfg = field(default_factory=ArchStudioCfg)
     poller: PollerCfg = field(default_factory=PollerCfg)
     workflow: WorkflowCfg = field(default_factory=WorkflowCfg)
     autonomy: AutonomyCfg = field(default_factory=AutonomyCfg)
@@ -398,6 +411,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
     q_d = data.get("quality") if isinstance(data.get("quality"), dict) else {}
     ev_d = data.get("evidence") if isinstance(data.get("evidence"), dict) else {}
     lav_d = data.get("lavish") if isinstance(data.get("lavish"), dict) else {}
+    arch_d = data.get("arch_studio") if isinstance(data.get("arch_studio"), dict) else {}
     pol_d = data.get("poller") if isinstance(data.get("poller"), dict) else {}
     wf_d = data.get("workflow") if isinstance(data.get("workflow"), dict) else {}
     aut_d = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
@@ -562,6 +576,13 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             enabled=str(lav_d.get("enabled") or "auto"),
             repos={str(k): str(v) for k, v in (lav_d.get("repos") or {}).items()}
             if isinstance(lav_d.get("repos"), dict)
+            else {},
+        ),
+        arch_studio=ArchStudioCfg(
+            enabled=str(arch_d.get("enabled") or "auto"),
+            require_review=bool(arch_d.get("require_review", True)),
+            repos={str(k): str(v) for k, v in (arch_d.get("repos") or {}).items()}
+            if isinstance(arch_d.get("repos"), dict)
             else {},
         ),
         poller=PollerCfg(

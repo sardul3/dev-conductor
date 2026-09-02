@@ -42,7 +42,7 @@ Not part of `/dev-loop`. Cursor install still copies it with the other skills.
 
 | Skill | Use |
 | ----- | --- |
-| `arch-studio` | Canonical `.arch.json` → draw.io, `review.html`, Azure/K8s gates, UI spec. Discovery uses `design-tree-interview`. |
+| `arch-studio` | Canonical `.arch.json` → draw.io, `review.html`, Azure/K8s gates, UI spec. After `spec.md` in `/dev-loop` when `arch_studio.json` is enabled; Cursor chat gate via `dev-loop arch approve/reject`. |
 
 ## Agents
 
