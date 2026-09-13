@@ -144,12 +144,12 @@ def prepare_launch(
     now_utc: str | None = None,
 ) -> dict:
     env = env if env is not None else dict(os.environ)
-    catalog = load_catalog(catalog_path)
     settings = {}
     settings_path = Path(home) / ".claude" / "settings.json"
     if settings_path.is_file():
         settings = load_settings(settings_path)
     chosen_backend = backend or detect_backend(env, settings)
+    catalog = load_catalog(catalog_path, backend=chosen_backend)
     sections = _sections(prompt_text)
     chosen_profile = profile or (PROFILE_LINE.search(prompt_text).group(1) if PROFILE_LINE.search(prompt_text) else None)
     if not chosen_profile:

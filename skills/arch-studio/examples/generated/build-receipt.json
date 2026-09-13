@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "generator": {
+    "name": "arch-studio",
+    "version": "1.1.0"
+  },
+  "generated_at": "2026-09-02T12:32:17Z",
+  "project_id": "retail-order-integration",
+  "project_version": "1.0.0",
+  "model_sha256": "e40c02aeaf3765337c6f39111fa9d6c6ff5670ff4c1928684ed56f4c15b87a92",
+  "gate": {
+    "status": "pass",
+    "blocking": 0,
+    "waived": 0,
+    "warnings": 0,
+    "info": 0,
+    "total": 0,
+    "generated_at": "2026-09-02T12:32:17Z"
+  },
+  "artifacts": [
+    {
+      "name": "retail-order-integration.arch.json",
+      "sha256": "bd7cd7f258f63aff56080c1c75570ba28669ef90469417b7e81890a053441eeb",
+      "bytes": 134712
+    },
+    {
+      "name": "retail-order-integration.drawio",
+      "sha256": "20d5ec16a1e16a8262419aa71f697f7fe2acf777260e4cd24ea685fb2f067e07",
+      "bytes": 221492
+    },
+    {
+      "name": "review.html",
+      "sha256": "bf4bf16932d771b7383b892d1b11fda460386a0fb154be5d7c80b3833682f2e2",
+      "bytes": 308391
+    },
+    {
+      "name": "governance-report.json",
+      "sha256": "fa98d004a36b839ded82e15b75c0a9654d5cec3751973211432468d53fd63f67",
+      "bytes": 490
+    },
+    {
+      "name": "governance-report.md",
+      "sha256": "b469c602ed353f28605f06f0c3980f8a263774315e67d42d4b3ee972593099a7",
+      "bytes": 420
+    },
+    {
+      "name": "traceability.csv",
+      "sha256": "19177bf0949a7cfde506249c2e9d39d82aef5a09b2d6e84d5e8a45f3d545fa0c",
+      "bytes": 51340
+    },
+    {
+      "name": "architecture-decisions.md",
+      "sha256": "1436d6db9010795cade5858675fd6b9ad4c8dbb582ce2dae4f63eba1df7305c8",
+      "bytes": 7107
+    },
+    {
+      "name": "risk-and-threat-summary.md",
+      "sha256": "05fc728a24a31565f9782645ae0566d349654db86d678ccb0d28b323c5008fb0",
+      "bytes": 4530
+    },
+    {
+      "name": "ui-specification.md",
+      "sha256": "992addb6e4d00366257c44ed7a37e4e1c3874f3f55837bf8459ee684227637f6",
+      "bytes": 9248
+    },
+    {
+      "name": "ui-component-matrix.csv",
+      "sha256": "18782652a013083d90ef30f838ac17fb95ba284218dff1e124787dfeec0535f3",
+      "bytes": 2226
+    },
+    {
+      "name": "ui-acceptance-plan.md",
+      "sha256": "b5e6ef16bb7ad1bc266b51750c0e0f258f61bb44d211f2b7a899d2882db387b7",
+      "bytes": 6003
+    },
+    {
+      "name": "design-tokens.json",
+      "sha256": "4b8345817d19a1cb9706e9746768d3a47ef3842e0d818a56315b77b5ae8d0ab9",
+      "bytes": 821
+    }
+  ],
+  "claims": {
+    "drawio": "Multi-page uncompressed mxGraph XML parsed successfully.",
+    "review_html": "Self-contained static review workspace; no animation or external runtime dependency.",
+    "governance": "Design-time model assessment only; not live compliance evidence.",
+    "ui_spec": "Responsive UI, state, binding, accessibility, and acceptance artifacts derived from the same canonical model; not implementation conformance evidence."
+  }
+}

@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pick import CREATE_ID, init_local_repo, list_candidates
+from pick import CREATE_ID, PYTHON_GITIGNORE, init_local_repo, list_candidates
 
 
 def _mkdir(p: Path) -> Path:
@@ -55,3 +55,7 @@ class PickTests(unittest.TestCase):
 
     def test_create_id_is_stable(self) -> None:
         self.assertEqual(CREATE_ID, "__create__")
+
+    def test_python_gitignore_includes_pycache(self) -> None:
+        self.assertIn("__pycache__/", PYTHON_GITIGNORE)
+        self.assertIn(".venv/", PYTHON_GITIGNORE)

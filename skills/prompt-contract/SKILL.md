@@ -1,15 +1,21 @@
 ---
 name: prompt-contract
-description: Fill the nine-slot prompt contract, then grill, then hand off to a clean Claude session. Use for new substantial tasks. Do not implement in this session.
+description: Fill the nine-slot prompt contract, grill with design-tree-interview, then hand off. Use for new substantial ad-hoc tasks, /deep-ask, or prompt-enrich. If the prompt already loaded story-spec or names a /dev-loop ticket, do not hand off to an implement session — stay on spec.md.
 ---
 
 # Prompt contract
 
-You are in the **enrichment** session. Do **not** implement the user's task here. Do not open extra Cursor tabs. The work happens in a new `claude` CLI terminal after launch.
+You are in the **enrichment** session. Do **not** implement the user's task here.
 
 If the user typed `/deep-ask ...`, treat the rest of the message as the original request.
 
-## 1. Fill these nine slots
+## `/dev-loop` spec (short circuit)
+
+If the prompt says `story-spec`, includes a ticket key + run dir, or `issue.md` is the source of requirements: load `story-spec` and `design-tree-interview` **spec mode** only. Do not run `session-handoff` or `launch-clean-claude.sh`. Infer contract slots silently if they help the grill; the deliverable is `spec.md`.
+
+## Ad-hoc tasks
+
+### 1. Fill these nine slots
 
 Infer when obvious. Ask only for missing **high-impact** slots. Multiselect is allowed for role, audience, and length/tone. Do not ask for a raw model id unless they volunteer an override (`opus`, `sonnet`, `ultra`, or a profile name).
 
@@ -27,24 +33,16 @@ Infer when obvious. Ask only for missing **high-impact** slots. Multiselect is a
 
 Profile tie-break: vision if screenshots/UI; else heavy if many files / production / security; else reason if debug/design/investigate; else code if the output is code/tests; else fast.
 
-Optional (only if they change the work): examples, tools/sources, plan-then-code vs jump-to-code.
+Assembled markdown shape: [reference.md](reference.md).
 
-See `reference.md` in this skill for the assembled markdown shape.
+### 2. Grill
 
-## 2. Grill
+Follow `design-tree-interview` (mode B Cursor or C Claude enrich). Escape: “just go”, “skip grill”, `/skip-enrich`. If they get lost, `restate-plain`.
 
-Follow `~/.claude/skills/design-tree-interview/SKILL.md` (or `/grill-plan`). Fill remaining contract slots from the tree. Escape: “just go”, “skip grill”, `/skip-enrich`. If they get lost, `restate-plain`.
-
-## 3. Handoff and launch
+### 3. Handoff
 
 When the frontier is empty (or they skip):
 
-1. Follow `~/.claude/skills/session-handoff/SKILL.md`. Start the file with `<!-- PROMPT_CONTRACT_V1 -->` and include the nine slots plus original request.
-2. Run (replace the path with the file you wrote):
-
-```bash
-~/.claude/hooks/prompt-enrich/launch-clean-claude.sh --file <handoff-path>
-```
-
-3. Tell the user the saved path and that **work continues in the new terminal**. Suggest that session load `implement-terse`.
-4. Stop. Do not start coding in this session. The new tab is the only implementer; this tab continuing will 429 OpenRouter.
+1. Follow `session-handoff`. Start the file with `<!-- PROMPT_CONTRACT_V1 -->`.
+2. **Cursor:** new Agent on the handoff path. Stop.
+3. **Claude Code:** `~/.claude/hooks/prompt-enrich/launch-clean-claude.sh --file <handoff-path>`. Work continues in that terminal. Stop here (two sessions on OpenRouter will 429).

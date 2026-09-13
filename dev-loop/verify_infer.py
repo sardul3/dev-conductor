@@ -10,12 +10,39 @@ from pathlib import Path
 
 from config import DevLoopConfig
 
+_PYTEST_MISSING = "no pytest in this environment; expected uv run pytest"
+
 
 @dataclass
 class VerifyRecipe:
     test: list[str]
     build: list[str]
     health: str | None = None
+
+
+def is_uv_project(repo: Path) -> bool:
+    if (repo / "uv.lock").is_file():
+        return True
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.is_file():
+        return False
+    try:
+        text = pyproject.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "[tool.uv]" in text or "[tool.uv." in text
+
+
+def python_tool_cmd(repo: Path, tool: str, *args: str) -> list[str]:
+    extra = [str(a) for a in args]
+    if is_uv_project(repo) and shutil.which("uv"):
+        return ["uv", "run", tool, *extra]
+    venv_bin = repo / ".venv" / "bin" / tool
+    if venv_bin.is_file():
+        return [str(venv_bin), *extra]
+    if tool == "pytest":
+        return ["python3", "-m", "pytest", *extra]
+    return [tool, *extra]
 
 
 def infer_recipe(repo: Path, cfg: DevLoopConfig) -> VerifyRecipe | None:
@@ -50,7 +77,8 @@ def infer_recipe(repo: Path, cfg: DevLoopConfig) -> VerifyRecipe | None:
         return VerifyRecipe(test=["go", "test", "./..."], build=["go", "build", "./..."], health=health)
 
     if (repo / "pyproject.toml").is_file() or (repo / "pytest.ini").is_file() or (repo / "tests").is_dir():
-        return VerifyRecipe(test=["python3", "-m", "pytest", "-q"], build=["python3", "-m", "pytest", "-q"], health=health)
+        cmd = python_tool_cmd(repo, "pytest", "-q")
+        return VerifyRecipe(test=cmd, build=list(cmd), health=health)
 
     return None
 
@@ -73,6 +101,13 @@ def check_health(url: str, timeout: int = 8) -> tuple[bool, str]:
         return False, str(exc)
 
 
+def _pytest_missing_hint(out: str) -> str:
+    low = out.lower()
+    if "no module named pytest" not in low and "no module named 'pytest'" not in low:
+        return ""
+    return _PYTEST_MISSING
+
+
 def run_verify(repo: Path, cfg: DevLoopConfig, log_path: Path | None = None) -> int:
     recipe = infer_recipe(repo, cfg)
     if recipe is None:
@@ -89,8 +124,11 @@ def run_verify(repo: Path, cfg: DevLoopConfig, log_path: Path | None = None) -> 
         if cmd == recipe.build and recipe.build == recipe.test and label == "build":
             continue
         rc, out = run_cmd(repo, cmd, timeout=getattr(cfg, "verify_timeout_sec", 1800))
-        chunks.append(f"$ {' '.join(cmd)}\nexit {rc}\n{out}")
+        chunks.append(f"$ {' '.join(cmd)}\ncwd {repo}\nexit {rc}\n{out}")
         if rc != 0:
+            hint = _pytest_missing_hint(out)
+            if hint:
+                chunks[-1] = chunks[-1].rstrip() + "\n" + hint + "\n"
             if log_path:
                 log_path.write_text("\n\n".join(chunks), encoding="utf-8")
             return rc

@@ -36,6 +36,34 @@ def _blob(payload: dict) -> str:
     return " ".join(parts)
 
 
+def normalize_cursor_payload(raw: dict) -> dict:
+    inp = dict(raw.get("tool_input") or raw.get("toolInput") or {})
+    path = (
+        raw.get("file_path")
+        or raw.get("path")
+        or inp.get("path")
+        or inp.get("file_path")
+        or inp.get("target_directory")
+        or ""
+    )
+    name = str(raw.get("tool_name") or raw.get("toolName") or "Read")
+    inp.setdefault("path", path)
+    return {"tool_name": name, "tool_input": inp}
+
+
+def cursor_decision(raw: dict, stage: str | None) -> dict:
+    payload = normalize_cursor_payload(raw)
+    if should_deny(payload, stage):
+        return {
+            "permission": "deny",
+            "agent_message": (
+                "test-writer: do not Read implementation sources. "
+                "Use spec.md + contracts.md + test paths only."
+            ),
+        }
+    return {"permission": "allow"}
+
+
 def should_deny(payload: dict, stage: str | None) -> bool:
     if stage != "test-writer":
         return False

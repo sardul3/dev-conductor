@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "project_id": "retail-order-integration",
+  "project_version": "1.0.0",
+  "model_sha256": "e40c02aeaf3765337c6f39111fa9d6c6ff5670ff4c1928684ed56f4c15b87a92",
+  "summary": {
+    "status": "pass",
+    "blocking": 0,
+    "waived": 0,
+    "warnings": 0,
+    "info": 0,
+    "total": 0,
+    "generated_at": "2026-09-02T12:32:17Z"
+  },
+  "findings": [],
+  "scope": "Design-time assessment of the canonical model; not live Azure or Kubernetes compliance evidence."
+}

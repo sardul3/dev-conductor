@@ -1,0 +1,140 @@
+{
+  "_policy": "CCR/OpenRouter ids must be :free (or OpenRouter/openrouter/free). Do not add paid OpenRouter slugs.",
+  "ccr_free_chain": [
+    "OpenRouter/poolside/laguna-s-2.1:free",
+    "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+    "OpenRouter/openai/gpt-oss-20b:free",
+    "OpenRouter/google/gemma-4-31b-it:free",
+    "OpenRouter/cohere/north-mini-code:free",
+    "OpenRouter/inclusionai/ling-3.0-flash:free",
+    "OpenRouter/google/gemma-4-26b-a4b-it:free",
+    "OpenRouter/nvidia/nemotron-3-nano-30b-a3b:free",
+    "OpenRouter/poolside/laguna-xs-2.1:free",
+    "OpenRouter/openrouter/free"
+  ],
+  "aliases": {
+    "opus": {
+      "ccr": "OpenRouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "anthropic": "opus"
+    },
+    "sonnet": {
+      "ccr": "OpenRouter/poolside/laguna-s-2.1:free",
+      "anthropic": "sonnet"
+    },
+    "haiku": {
+      "ccr": "OpenRouter/poolside/laguna-xs-2.1:free",
+      "anthropic": "haiku"
+    },
+    "fable": {
+      "ccr": "OpenRouter/poolside/laguna-xs-2.1:free",
+      "anthropic": "fable"
+    },
+    "ultra": {
+      "ccr": "OpenRouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "anthropic": "opus"
+    }
+  },
+  "ccr": {
+    "fast": {
+      "primary": "OpenRouter/poolside/laguna-xs-2.1:free",
+      "fallback": "OpenRouter/poolside/laguna-s-2.1:free",
+      "fallbacks": [
+        "OpenRouter/poolside/laguna-s-2.1:free",
+        "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "OpenRouter/openai/gpt-oss-20b:free",
+        "OpenRouter/google/gemma-4-31b-it:free",
+        "OpenRouter/cohere/north-mini-code:free",
+        "OpenRouter/inclusionai/ling-3.0-flash:free",
+        "OpenRouter/google/gemma-4-26b-a4b-it:free",
+        "OpenRouter/nvidia/nemotron-3-nano-30b-a3b:free",
+        "OpenRouter/openrouter/free"
+      ]
+    },
+    "code": {
+      "primary": "OpenRouter/poolside/laguna-s-2.1:free",
+      "fallback": "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "fallbacks": [
+        "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "OpenRouter/openai/gpt-oss-20b:free",
+        "OpenRouter/google/gemma-4-31b-it:free",
+        "OpenRouter/cohere/north-mini-code:free",
+        "OpenRouter/inclusionai/ling-3.0-flash:free",
+        "OpenRouter/google/gemma-4-26b-a4b-it:free",
+        "OpenRouter/nvidia/nemotron-3-nano-30b-a3b:free",
+        "OpenRouter/poolside/laguna-xs-2.1:free",
+        "OpenRouter/openrouter/free"
+      ]
+    },
+    "reason": {
+      "primary": "OpenRouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "fallback": "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "fallbacks": [
+        "OpenRouter/poolside/laguna-s-2.1:free",
+        "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "OpenRouter/openai/gpt-oss-20b:free",
+        "OpenRouter/google/gemma-4-31b-it:free",
+        "OpenRouter/cohere/north-mini-code:free",
+        "OpenRouter/inclusionai/ling-3.0-flash:free",
+        "OpenRouter/google/gemma-4-26b-a4b-it:free",
+        "OpenRouter/nvidia/nemotron-3-nano-30b-a3b:free",
+        "OpenRouter/poolside/laguna-xs-2.1:free",
+        "OpenRouter/openrouter/free"
+      ]
+    },
+    "heavy": {
+      "primary": "OpenRouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "fallback": "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "fallbacks": [
+        "OpenRouter/poolside/laguna-s-2.1:free",
+        "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "OpenRouter/openai/gpt-oss-20b:free",
+        "OpenRouter/google/gemma-4-31b-it:free",
+        "OpenRouter/cohere/north-mini-code:free",
+        "OpenRouter/inclusionai/ling-3.0-flash:free",
+        "OpenRouter/google/gemma-4-26b-a4b-it:free",
+        "OpenRouter/nvidia/nemotron-3-nano-30b-a3b:free",
+        "OpenRouter/poolside/laguna-xs-2.1:free",
+        "OpenRouter/openrouter/free"
+      ]
+    },
+    "vision": {
+      "primary": "OpenRouter/nvidia/nemotron-nano-12b-v2-vl:free",
+      "fallback": "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "fallbacks": [
+        "OpenRouter/poolside/laguna-s-2.1:free",
+        "OpenRouter/nvidia/nemotron-3-super-120b-a12b:free",
+        "OpenRouter/openai/gpt-oss-20b:free",
+        "OpenRouter/google/gemma-4-31b-it:free",
+        "OpenRouter/cohere/north-mini-code:free",
+        "OpenRouter/inclusionai/ling-3.0-flash:free",
+        "OpenRouter/google/gemma-4-26b-a4b-it:free",
+        "OpenRouter/nvidia/nemotron-3-nano-30b-a3b:free",
+        "OpenRouter/poolside/laguna-xs-2.1:free",
+        "OpenRouter/openrouter/free"
+      ]
+    }
+  },
+  "anthropic": {
+    "fast": {
+      "primary": "haiku",
+      "primary_alt": "fable",
+      "fallback": "sonnet"
+    },
+    "code": {
+      "primary": "sonnet",
+      "fallback": "opus"
+    },
+    "reason": {
+      "primary": "opus",
+      "fallback": "sonnet"
+    },
+    "heavy": {
+      "primary": "opus",
+      "fallback": "sonnet"
+    },
+    "vision": {
+      "primary": "sonnet",
+      "fallback": "opus"
+    }
+  }
+}

@@ -11,7 +11,9 @@ from agent_memory import (  # noqa: E402
     ApplyError,
     apply_from_verdict,
     apply_item,
+    apply_run_memory,
 )
+from config import AgentMemoryCfg, DevLoopConfig  # noqa: E402
 
 
 class AgentMemoryTests(unittest.TestCase):
@@ -141,6 +143,67 @@ class AgentMemoryTests(unittest.TestCase):
                         "durable": False,
                     },
                 )
+
+    def test_given_verdict_and_memory_json_when_apply_run_then_writes_repo_files(self) -> None:
+        cfg = DevLoopConfig(agent_memory=AgentMemoryCfg(auto_apply=True))
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "repo"
+            run = Path(td) / "run"
+            repo.mkdir()
+            run.mkdir()
+            (repo / "AGENTS.md").write_text("# Repo\n", encoding="utf-8")
+            (run / "verdict.json").write_text(
+                json.dumps(
+                    {
+                        "verdict": "good",
+                        "metadata": [
+                            {
+                                "target": "agents",
+                                "text": "Do not use Jira MCP; REST only.",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run / "memory.json").write_text(
+                json.dumps(
+                    {
+                        "metadata": [
+                            {
+                                "target": "rule",
+                                "path": ".claude/rules/python-http.mdc",
+                                "globs": ["**/*.py"],
+                                "text": "Health handlers must not catch-all Exception into HTTP 200.",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            results = apply_run_memory(cfg, repo, run)
+            statuses = {r["status"] for r in results}
+            self.assertEqual(statuses, {"applied"})
+            self.assertIn("Jira MCP", (repo / "AGENTS.md").read_text(encoding="utf-8"))
+            rule = repo / ".claude/rules/python-http.mdc"
+            self.assertTrue(rule.is_file())
+            self.assertIn("alwaysApply: false", rule.read_text(encoding="utf-8"))
+            applied = json.loads((run / "memory-applied.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(applied), 2)
+
+    def test_given_auto_apply_off_when_apply_run_then_noop(self) -> None:
+        cfg = DevLoopConfig(agent_memory=AgentMemoryCfg(auto_apply=False))
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "repo"
+            run = Path(td) / "run"
+            repo.mkdir()
+            run.mkdir()
+            (run / "verdict.json").write_text(
+                json.dumps({"metadata": [{"target": "agents", "text": "x"}]}),
+                encoding="utf-8",
+            )
+            self.assertEqual(apply_run_memory(cfg, repo, run), [])
+            self.assertFalse((run / "memory-applied.json").is_file())
 
 
 if __name__ == "__main__":

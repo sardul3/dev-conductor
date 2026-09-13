@@ -1,0 +1,24 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "project_id": "retail-order-integration",
+  "design_system": "Fluent 2 reference profile",
+  "source": "Proposed Azure-aligned default; replace with the repository design system when one exists",
+  "tokens": {
+    "color.text.primary": "#101828",
+    "color.text.secondary": "#475467",
+    "color.surface.default": "#FFFFFF",
+    "color.surface.subtle": "#F9FAFB",
+    "color.action.primary": "#175CD3",
+    "color.status.danger": "#B42318",
+    "type.body.size": "16px",
+    "type.heading.weight": 700,
+    "space.control.gap": "12px",
+    "space.layout.gutter": "24px",
+    "radius.control": "8px",
+    "focus.ring": "2px solid #2E90FA"
+  },
+  "motion": {
+    "enabled": false,
+    "contract": "Static state changes only; no animation."
+  }
+}

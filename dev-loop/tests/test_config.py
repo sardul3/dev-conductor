@@ -55,11 +55,23 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(cfg.quality.mutation.metric, "killed")
         self.assertEqual(cfg.quality.mutation.min_pct, 75.0)
         self.assertFalse(cfg.evidence.enabled)
+        self.assertFalse(cfg.evidence.require_visual)
         self.assertFalse(cfg.workflow.enabled)
         self.assertFalse(cfg.git.stack_prs)
         self.assertEqual(cfg.autonomy.profile, "unattended")
         self.assertTrue(cfg.runtime.auto_continue)
         self.assertFalse(cfg.repo_pick.ask_when_cwd_not_repo)
+
+    def test_given_yaml_without_workflow_when_load_then_workflow_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "config.yaml"
+            p.write_text("jira:\n  project: LCN\n", encoding="utf-8")
+            cfg = load_config(p)
+            self.assertTrue(cfg.workflow.enabled)
+            self.assertEqual(cfg.workflow.on_start, "In Progress")
+            self.assertTrue(cfg.workflow.comment_on_progress)
+            self.assertTrue(cfg.workflow.assign_on_start)
+            self.assertTrue(cfg.evidence.require_visual)
 
     def test_given_unattended_profile_when_load_then_skips_human_spec_gate(self) -> None:
         with tempfile.TemporaryDirectory() as td:

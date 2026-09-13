@@ -108,8 +108,12 @@ evidence:
   enabled: false
   mode: http
   probes: []
+  require_visual: false
 
 lavish:
+  enabled: off
+
+arch_studio:
   enabled: off
 
 poller:

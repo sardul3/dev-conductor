@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Installed to ~/.local/bin/dev-loop by cursor/dev-loop/install.sh
+set -euo pipefail
+CLI="${HOME}/.claude/hooks/dev-loop/cli.py"
+if [[ ! -f "${CLI}" ]]; then
+  echo "dev-loop: CLI missing at ${CLI} — run ./cursor/dev-loop/install.sh" >&2
+  exit 1
+fi
+exec python3 "${CLI}" "$@"

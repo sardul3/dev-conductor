@@ -1,11 +1,11 @@
 ---
 name: agent-memory
-description: Persist durable agent metadata after self-review, user review, PR comments, or a correction. Use when verdict.json metadata[], review feedback, or a user correction implies a missing convention, term, or stack law.
+description: Persist a durable convention, term, or stack law after self-review, PR comments, or a user correction. Use when verdict.json has metadata[], a review says agents keep missing X, or a domain term was resolved. Skip one-ticket acceptance criteria and style nits.
 ---
 
 # Agent memory
 
-Feedback is wasted if the next session repeats the same miss. Prefer the **harness** over hand-editing.
+Feedback is wasted if the next session repeats the same miss. Prefer the **harness** over hand-editing so path-scoped rules stay `alwaysApply: false` and secrets never land in git.
 
 ## Structured path (preferred)
 
@@ -33,7 +33,7 @@ Feedback is wasted if the next session repeats the same miss. Prefer the **harne
 }
 ```
 
-2. Conductor auto-applies when `agent_memory.auto_apply: true` (default), writing `memory-applied.json` in the run dir.
+2. Conductor auto-applies when `agent_memory.auto_apply: true` (default): Claude `continue` after review, Cursor `step` after review / before ship, and `poll` before launching a PR fixer. Writes `memory-applied.json` in the run dir. Human PR comments go in `memory.json` (or `verdict.json` `metadata[]`); the fixer should still run `cli.py agent-memory` so it lands immediately instead of waiting for the next poll.
 3. Manual: `python3 ~/.claude/hooks/dev-loop/cli.py agent-memory --repo REPO --verdict PATH` (or `--key TICKET`).
 
 Targets: `agents` | `rule` | `context` | `readme`. Rules must be path-scoped (`globs`, never `always_apply`). Secrets/hooks paths are rejected. `durable: false` is rejected.

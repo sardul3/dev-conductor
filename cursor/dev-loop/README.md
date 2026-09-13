@@ -1,9 +1,5 @@
 # Cursor port of /dev-loop
 
-Unique to Cursor: this `install.sh` and `rules/dev-loop.mdc`.
+Canonical install and usage: **[../README.md](../README.md)**.
 
-Skill text is **not** copied here. Source of truth is `../../skills/`. Install copies from there into `~/.cursor/skills` and `~/.agents/skills`.
-
-```bash
-./cursor/dev-loop/install.sh
-```
+This directory holds the Cursor installer, hooks, and `dev-loop.mdc`. Skills live in `../../skills/`. The Agent `/dev-loop` prompt is `../commands/dev-loop.md`.

@@ -6,18 +6,29 @@ from pathlib import Path
 SKIP = "<!-- PROMPT_CONTRACT_V1 -->"
 
 
-def spec_prompt(key: str, run: Path, repo: Path, issue_md: str, *, lavish: bool = False) -> str:
+def spec_prompt(key: str, run: Path, repo: Path, issue_md: str, *, lavish: bool = False, arch: bool = False) -> str:
     extra = (
         "Load skill `lavish-ui`. This repo is UI (`lavish.enabled` resolved on). "
         "Keep Jira AC in `spec.md`. HTML is collaboration, not the contract.\n"
         if lavish else ""
     )
+    arch_extra = (
+        "Load skill `arch-studio` and `references/dev-loop.md`. `arch_studio.json` is enabled. "
+        f"After `spec.md`, build the architecture pack under `{run / 'architecture'}`, open "
+        f"`review.html` with Cursor `open_resource`, run the in-chat approve/reject gate "
+        f"(`dev-loop arch approve {key}` / `dev-loop arch reject {key}`), then ask to approve the spec.\n"
+        if arch else ""
+    )
     return (
         f"Load skill `story-spec`. Ticket `{key}`.\n"
         f"Repo: `{repo}`\n"
-        f"{extra}"
-        f"Write files only under `{run}`: `spec.md` when the grill is done, "
-        f"then `SPEC_APPROVED` (and `APPROVED`) after the user confirms the spec — not the ticket. Then `SESSION_DONE` (and `STAGE_DONE`).\n"
+        f"{extra}{arch_extra}"
+        f"Grill with Cursor AskQuestion: recommended choice first (label ends with (Recommended)), "
+        f"at most 4 options per question, whole frontier in one AskQuestion call. "
+        f"Do not paste CLI --help or argparse usage into chat.\n"
+        f"Write `spec.md` under `{run}` when the grill is done. "
+        f"After the user confirms the spec (not the ticket), run `dev-loop approve {key}` — "
+        f"do not write SPEC_APPROVED, APPROVED, STAGE_DONE, or SESSION_DONE yourself.\n"
         f"Do not implement. Do not open a PR.\n\n"
         f"## Jira {key}\n\n{issue_md}\n"
     )
@@ -46,7 +57,9 @@ def writer_prompt(key: str, run: Path, repo: Path, spec: str, verify_log: str = 
         f"Load skill `tdd` and `implement-terse`.\n"
         f"Ticket `{key}`. Repo `{repo}`.\n"
         f"{ui}"
-        f"Load `verify-before-done`. Implement until the new tests pass. Do not weaken tests unless they contradict the spec "
+        f"Load `verify-before-done`. Implement until the new tests pass. After tests are green, write terminal "
+        f"snapshots (png/jpg/webp/gif/webm/mp4: tests.png, run.png, curl.png) to `{run / 'evidence'}` before STAGE_DONE. "
+        f"Do not weaken tests unless they contradict the spec "
         f"or fail to compile from syntax/IO mistakes.\n"
         f"If verify failed, spawn `debugger` (systematic-debugging) for root cause before patching.\n"
         f"Docs: load `domain-glossary` only if a domain term or a hard-to-reverse decision changed. If self-review or user feedback corrected a durable convention, load `agent-memory` and update one relevant file. "

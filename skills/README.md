@@ -17,6 +17,7 @@ Source of truth is this directory. Plugin and Cursor install from here (`plugins
 | `dev-loop-review` | `verdict.json` via `code-reviewer` |
 | `pr-comment-fixer` | Address PR review comments |
 | `jira-progress` | Jira REST column moves + comments |
+| `agent-memory` | Durable conventions from `verdict.json` `metadata[]` |
 | `lavish-ui` | Spike: Lavish HTML review for UI/UX tickets only |
 
 ## Coding / ops (used by the loop)
@@ -27,13 +28,21 @@ Source of truth is this directory. Plugin and Cursor install from here (`plugins
 | `systematic-debugging` | Root cause before patch |
 | `verify-before-done` | Proof before “done” |
 | `code-review` | Spawn `code-reviewer` on the diff |
-| `finish-branch` | Tests then merge/PR options |
+| `finish-branch` | Ad-hoc merge/PR options — **not** `/dev-loop` ship |
 | `implement-terse` | Work-session tone |
 | `token-playbook` | Where context should live |
 
 ## Prompt-enrich (grill)
 
 `prompt-contract`, `design-tree-interview`, `grill-plan`, `grill-plan-docs`, `session-handoff`, `domain-glossary`, `restate-plain`, `grill-deep-ask`
+
+## Architecture / UI spec (optional)
+
+Not part of `/dev-loop`. Cursor install still copies it with the other skills.
+
+| Skill | Use |
+| ----- | --- |
+| `arch-studio` | Canonical `.arch.json` → draw.io, `review.html`, Azure/K8s gates, UI spec. After `spec.md` in `/dev-loop` when `arch_studio.json` is enabled; Cursor chat gate via `dev-loop arch approve/reject`. |
 
 ## Agents
 

@@ -211,6 +211,8 @@ class EvidenceCfg:
     timeout_sec: int = 8
     probes: list = None  # type: ignore[assignment]
     playwright_cmd: str = ""
+    # Default on: ship refuses without png/jpg/webp/gif/webm/mp4 under runs/KEY/evidence/.
+    require_visual: bool = True
 
     def __post_init__(self) -> None:
         if self.probes is None:
@@ -221,6 +223,18 @@ class EvidenceCfg:
 class LavishCfg:
     # auto = on only when the repo looks like UI (React/Vue/shadcn/…). on | off | auto.
     enabled: str = "auto"
+    repos: dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.repos is None:
+            self.repos = {}
+
+
+@dataclass
+class ArchStudioCfg:
+    # auto = on for integration/architecture tickets or IaC-heavy repos. on | off | auto.
+    enabled: str = "auto"
+    require_review: bool = True
     repos: dict[str, str] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
@@ -244,9 +258,12 @@ class PollerCfg:
             self.bot_logins = []
 
 
+DEFAULT_ON_PR_COMMENT = "PR #{number} opened on {branch}\n{pr_url}"
+
+
 @dataclass
 class WorkflowCfg:
-    enabled: bool = False
+    enabled: bool = True
     on_start: str = "In Progress"
     on_pr: str = "In Review"
     on_merge: str = "Done"
@@ -255,6 +272,9 @@ class WorkflowCfg:
     deploy_ticket_jql: str = ""
     deploy_ticket_key: str = ""
     comment_on_progress: bool = True
+    assign_on_start: bool = True
+    assign_force: bool = False
+    on_pr_comment: str = DEFAULT_ON_PR_COMMENT
 
 
 @dataclass
@@ -291,6 +311,7 @@ class DevLoopConfig:
     quality: QualityCfg = field(default_factory=QualityCfg)
     evidence: EvidenceCfg = field(default_factory=EvidenceCfg)
     lavish: LavishCfg = field(default_factory=LavishCfg)
+    arch_studio: ArchStudioCfg = field(default_factory=ArchStudioCfg)
     poller: PollerCfg = field(default_factory=PollerCfg)
     workflow: WorkflowCfg = field(default_factory=WorkflowCfg)
     autonomy: AutonomyCfg = field(default_factory=AutonomyCfg)
@@ -390,6 +411,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
     q_d = data.get("quality") if isinstance(data.get("quality"), dict) else {}
     ev_d = data.get("evidence") if isinstance(data.get("evidence"), dict) else {}
     lav_d = data.get("lavish") if isinstance(data.get("lavish"), dict) else {}
+    arch_d = data.get("arch_studio") if isinstance(data.get("arch_studio"), dict) else {}
     pol_d = data.get("poller") if isinstance(data.get("poller"), dict) else {}
     wf_d = data.get("workflow") if isinstance(data.get("workflow"), dict) else {}
     aut_d = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
@@ -548,11 +570,19 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             timeout_sec=int(ev_d.get("timeout_sec") or 8),
             probes=list(ev_d.get("probes") or []) if isinstance(ev_d.get("probes"), list) else [],
             playwright_cmd=str(ev_d.get("playwright_cmd") or ""),
+            require_visual=bool(ev_d.get("require_visual", True)),
         ),
         lavish=LavishCfg(
             enabled=str(lav_d.get("enabled") or "auto"),
             repos={str(k): str(v) for k, v in (lav_d.get("repos") or {}).items()}
             if isinstance(lav_d.get("repos"), dict)
+            else {},
+        ),
+        arch_studio=ArchStudioCfg(
+            enabled=str(arch_d.get("enabled") or "auto"),
+            require_review=bool(arch_d.get("require_review", True)),
+            repos={str(k): str(v) for k, v in (arch_d.get("repos") or {}).items()}
+            if isinstance(arch_d.get("repos"), dict)
             else {},
         ),
         poller=PollerCfg(
@@ -566,7 +596,7 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             merge_method=str(pol_d.get("merge_method") or git_d.get("merge_method") or "squash"),
         ),
         workflow=WorkflowCfg(
-            enabled=bool(wf_d.get("enabled", False)),
+            enabled=bool(wf_d.get("enabled", True)),
             on_start=str(wf_d.get("on_start") or "In Progress"),
             on_pr=str(wf_d.get("on_pr") or "In Review"),
             on_merge=str(wf_d.get("on_merge") or "Done"),
@@ -575,6 +605,9 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             deploy_ticket_jql=str(wf_d.get("deploy_ticket_jql") or ""),
             deploy_ticket_key=str(wf_d.get("deploy_ticket_key") or ""),
             comment_on_progress=bool(wf_d.get("comment_on_progress", True)),
+            assign_on_start=bool(wf_d.get("assign_on_start", True)),
+            assign_force=bool(wf_d.get("assign_force", False)),
+            on_pr_comment=str(wf_d.get("on_pr_comment") or DEFAULT_ON_PR_COMMENT),
         ),
         stages_enabled=enabled,
         autonomy=AutonomyCfg(

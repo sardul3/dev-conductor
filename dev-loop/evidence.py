@@ -10,6 +10,84 @@ from typing import Any, Callable
 
 UrlOpen = Callable[..., Any]
 
+VISUAL_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".webm", ".mp4"}
+
+
+class VisualEvidenceMissing(RuntimeError):
+    """Ship gate: require_visual is on and runs/KEY/evidence/ has no image/video."""
+
+
+def evidence_dir(run: Path) -> Path:
+    return Path(run) / "evidence"
+
+
+def list_visual_evidence(run: Path | None) -> list[Path]:
+    if run is None:
+        return []
+    dest = evidence_dir(run)
+    if not dest.is_dir():
+        return []
+    files: list[Path] = []
+    for p in sorted(dest.iterdir()):
+        if p.is_file() and p.suffix.lower() in VISUAL_SUFFIXES:
+            files.append(p)
+    return files
+
+
+def require_visual_evidence(cfg: Any, run: Path | None) -> list[Path]:
+    ev = getattr(cfg, "evidence", None)
+    required = True if ev is None else bool(getattr(ev, "require_visual", True))
+    files = list_visual_evidence(run)
+    if not required:
+        return files
+    if files:
+        return files
+    dest = evidence_dir(run) if run is not None else Path("runs/KEY/evidence")
+    raise VisualEvidenceMissing(
+        "dev-loop: visual evidence required. Write snapshots "
+        f"(png/jpg/webp/gif/webm/mp4: tests.png, run.png, curl.png) to {dest} "
+        "then step again. Do not open a PR without them. Text-only verify.log is not enough."
+    )
+
+
+def visual_markdown(files: list[Path] | list[str]) -> str:
+    lines: list[str] = []
+    for item in files:
+        p = Path(item)
+        if not p.name:
+            continue
+        lines.append(f"![{p.stem}]({p.name})")
+    return "\n".join(lines)
+
+
+def comment_visual_evidence(
+    repo: Path,
+    pr_number: int,
+    files: list[Path],
+    gh_bin: str = "gh",
+) -> bool:
+    """Attach run-dir snapshots via `gh pr comment --attach`. Does not commit pngs."""
+    if not files or not pr_number:
+        return False
+    body_lines = ["## Evidence", ""]
+    for p in files:
+        body_lines.append(f"![{p.stem}]({p})")
+    body = "\n".join(body_lines) + "\n"
+    cmd = [gh_bin, "pr", "comment", str(pr_number), "--body", body]
+    for p in files:
+        cmd.extend(["--attach", str(p)])
+    proc = subprocess.run(cmd, cwd=str(repo), capture_output=True, text=True)
+    if proc.returncode == 0:
+        return True
+    fallback = [gh_bin, "pr", "comment", str(pr_number), "--body", body]
+    proc2 = subprocess.run(fallback, cwd=str(repo), capture_output=True, text=True)
+    err = (proc.stderr or proc.stdout or proc2.stderr or proc2.stdout or "").strip()
+    if proc2.returncode == 0:
+        print("dev-loop: gh pr comment posted without --attach (upgrade gh to upload snapshots)")
+        return True
+    print(f"dev-loop: evidence comment failed: {err}")
+    return False
+
 
 def render_http_markdown(
     method: str,

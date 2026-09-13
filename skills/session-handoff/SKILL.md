@@ -1,17 +1,17 @@
 ---
 name: session-handoff
-description: Compact this conversation into a handoff file for a fresh agent. Use when launching a clean Claude session or when the user asks for a handoff.
-argument-hint: "What the next session should focus on"
-disable-model-invocation: true
+description: Compact this conversation into a handoff file for a fresh agent. Use when launching a clean Claude session, spawning a new Cursor Agent after a grill, or the user asks for a handoff. Do not hand off a /dev-loop spec — stay in-chat and write spec.md.
 ---
 
 # Session handoff
 
-Write a handoff so a **new** agent can continue.
+A new agent has none of this chat. The file must be enough to continue **without** re-grilling locked decisions.
 
-**Do not use the Write tool** (it is sandboxed to the git worktree; `/tmp` writes are rejected). **Do not write into the project.**
+Do **not** use this for `/dev-loop` spec (`story-spec` stays in this chat). Do **not** use the project Write tool for `/tmp` (sandboxed; writes are rejected). Do **not** write the handoff into the repo.
 
-Pipe markdown to the saver, then launch:
+## Where to write
+
+**Claude Code:**
 
 ```bash
 python3 ~/.claude/hooks/prompt-enrich/save_handoff.py <<'EOF'
@@ -20,13 +20,10 @@ python3 ~/.claude/hooks/prompt-enrich/save_handoff.py <<'EOF'
 # Prompt contract
 ...
 EOF
-```
-
-The command prints a path under `~/.claude/prompt-enrichment/runs/`. Immediately run:
-
-```bash
 ~/.claude/hooks/prompt-enrich/launch-clean-claude.sh --file <that-path>
 ```
+
+**Cursor:** write the same body under `~/.config/dev-conductor/handoffs/` (not via project Write if sandboxed), then spawn a **new Agent** with that file as the prompt. Do not run `launch-clean-claude.sh`.
 
 Then stop. Do not implement in this session.
 
@@ -39,7 +36,7 @@ Then stop. Do not implement in this session.
 - Suggested skills the next agent should load
 - Model profile recommendation (`fast` `code` `reason` `heavy` `vision`) if known
 
-Start the file with `<!-- PROMPT_CONTRACT_V1 -->`.
+Start the file with `<!-- PROMPT_CONTRACT_V1 -->`. Assembled shape: `prompt-contract` [reference.md](../prompt-contract/reference.md).
 
 ## Must not
 

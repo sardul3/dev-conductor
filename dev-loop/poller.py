@@ -198,6 +198,14 @@ def poll_once(
         prn = int(item.get("pr") or 0)
         if not prn:
             continue
+        key = str(item.get("key") or "")
+        if key and repo.is_dir():
+            try:
+                from agent_memory import apply_run_memory
+
+                apply_run_memory(cfg, repo, run_dir(key))
+            except OSError:
+                pass
         try:
             pr = view_pr(item) if view_pr else gh_pr_view(repo, prn, gh_bin=cfg.git.gh_bin)
         except Exception as exc:

@@ -14,6 +14,8 @@ from treehouse import (
     count_active_runs,
     prepare_workspace,
     release_lease,
+    workspace_for_ticket,
+    workspace_notice,
     worktree_path,
 )
 
@@ -176,6 +178,16 @@ class TreehouseTests(unittest.TestCase):
         self.assertEqual(cfg.queue.max_active, 3)
 
 
+    def test_given_origin_when_worktree_path_then_sibling_dir_has_no_leading_dot(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            origin = Path(td) / "langchain"
+            origin.mkdir()
+            dest = worktree_path(origin, "LCN-2")
+            self.assertEqual(dest.name, "LCN-2")
+            self.assertEqual(dest.parent.name, "langchain-worktrees")
+            self.assertFalse(dest.parent.name.startswith("."))
+            self.assertEqual(dest.parent.parent, origin.resolve().parent)
+
     def test_given_worktree_isolation_when_prepare_then_adds_detached_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -222,6 +234,41 @@ class TreehouseTests(unittest.TestCase):
             ).stdout
             self.assertNotIn("ASE-9", listed)
 
+    def test_given_path_when_workspace_notice_then_unambiguous_line(self) -> None:
+        line = workspace_notice(Path("/tmp/langchain-worktrees/LCN-2"))
+        self.assertEqual(line, "dev-loop: workspace /tmp/langchain-worktrees/LCN-2")
+
+    def test_given_legacy_dotted_lease_when_prepare_then_reuses_existing_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            origin = _init_origin(root)
+            run = root / "runs" / "ASE-9"
+            run.mkdir(parents=True)
+            legacy = origin.parent / f".{origin.name}-worktrees" / "ASE-9"
+            legacy.parent.mkdir(parents=True)
+            subprocess.run(
+                ["git", "-C", str(origin), "worktree", "add", "--detach", str(legacy), "main"],
+                check=True,
+                capture_output=True,
+            )
+            (run / "lease.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "worktree",
+                        "path": str(legacy),
+                        "origin": str(origin.resolve()),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            cfg = DevLoopConfig()
+            cfg.git.isolation = "worktree"
+            cfg.queue.max_active = 3
+            workspace = prepare_workspace(origin, cfg, run, runs_root=root / "runs")
+            self.assertEqual(workspace, legacy)
+            self.assertFalse(worktree_path(origin, "ASE-9").exists())
+
     def test_given_existing_worktree_when_prepare_then_reuses_path(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -236,6 +283,30 @@ class TreehouseTests(unittest.TestCase):
             self.assertEqual(first, second)
             self.assertEqual((second / "scratch.txt").read_text(encoding="utf-8"), "keep\n")
 
+    def test_given_lease_when_workspace_for_ticket_then_prefers_worktree_not_cwd(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            origin = root / "langchain"
+            worktree = root / "langchain-worktrees" / "LCN-2"
+            origin.mkdir()
+            worktree.mkdir(parents=True)
+            run = root / "runs" / "LCN-2"
+            run.mkdir(parents=True)
+            (run / "lease.json").write_text(
+                json.dumps({"kind": "worktree", "path": str(worktree), "origin": str(origin)}) + "\n",
+                encoding="utf-8",
+            )
+            os.environ["DEVLOOP_HOME"] = str(root)
+            try:
+                got = workspace_for_ticket(
+                    "LCN-2",
+                    Path("/tmp/not-the-worktree"),
+                    {"origin_repo": str(origin), "repo": str(origin)},
+                )
+                self.assertEqual(got.resolve(), worktree.resolve())
+                self.assertNotEqual(got.resolve(), Path.cwd().resolve())
+            finally:
+                os.environ.pop("DEVLOOP_HOME", None)
 
 
 if __name__ == "__main__":

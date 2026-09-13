@@ -122,7 +122,30 @@ def acquire_lease(
 
 def worktree_path(origin: Path, key: str) -> Path:
     origin = origin.resolve()
-    return origin.parent / f".{origin.name}-worktrees" / key
+    # Visible sibling (no leading-dot parent). Do not `git worktree move` an
+    # in-progress tree without rsyncing untracked files first — git only moves
+    # the pointer and tracked content.
+    return origin.parent / f"{origin.name}-worktrees" / key
+
+
+def lease_workspace(run: Path) -> Path | None:
+    p = run / "lease.json"
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    raw = str(data.get("path") or "").strip()
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
+def workspace_notice(path: Path) -> str:
+    return f"dev-loop: workspace {path}"
 
 
 def _default_branch(origin: Path, runner: Runner | None = None) -> str:
@@ -204,7 +227,8 @@ def prepare_workspace(
     if isolation == "none":
         return origin
     if isolation == "worktree":
-        dest = worktree_path(origin, run.name)
+        existing = lease_workspace(run)
+        dest = existing if existing and existing.exists() else worktree_path(origin, run.name)
         path = _add_worktree(origin, dest, runner=runner)
         branch = _default_branch(origin, runner=runner)
         payload = {
@@ -238,19 +262,25 @@ def prepare_workspace(
 
 
 def workspace_for_run(run: Path, origin: Path) -> Path:
-    p = run / "lease.json"
-    if not p.is_file():
-        return origin
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return origin
-    if not isinstance(data, dict):
-        return origin
-    wt = Path(str(data.get("path") or "")).expanduser()
-    if str(wt) and wt.exists():
+    wt = lease_workspace(run)
+    if wt is not None and wt.exists():
         return wt
     return origin
+
+
+def workspace_for_ticket(key: str, repo_arg: Path | None, state: dict[str, Any] | None = None) -> Path:
+    """Leased worktree for KEY, else origin from --repo / state, never a random cwd."""
+    from paths import run_dir
+    from state import load_state
+
+    st = state if state is not None else load_state()
+    run = run_dir(str(key))
+    if repo_arg is not None:
+        origin = Path(repo_arg).expanduser()
+    else:
+        raw = st.get("origin_repo") or st.get("repo")
+        origin = Path(str(raw)).expanduser() if raw else Path.cwd()
+    return workspace_for_run(run, origin)
 
 
 def release_lease(
