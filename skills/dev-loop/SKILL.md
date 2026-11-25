@@ -26,7 +26,10 @@ If cwd is already the right git repo, `start KEY` without `--repo` is fine.
 ```bash
 python3 ~/.claude/hooks/dev-loop/cli.py start KEY [--repo PATH]
 python3 ~/.claude/hooks/dev-loop/cli.py continue KEY
+python3 ~/.claude/hooks/dev-loop/cli.py verify --repo PATH
 ```
+
+`verify` runs the pre-production gates (static, tests, boot, new CVEs, artifacts) and blocks the PR until that risk class is green. Load `verify-pipeline`. Deploy and release stay after merge.
 
 Poller: `cli.py poll` / `install-poller`. Never commit `main`/`master`.
 Agent reads use brief output (`cli.py` with no args, `keys`, `status`, `progress`). Picker JSON is `--format json`. New connector: `brief.Connector` + `fetch()`.

@@ -258,6 +258,40 @@ class WorkflowCfg:
 
 
 @dataclass
+class VerificationCfg:
+    """Pre-production gates. Risk class selects how much of A–G runs."""
+
+    enabled: bool = True
+    risk_class: str = "normal"
+    fix_cap: int = 2
+    tiny_max_lines: int = 40
+    coverage_min_pct: float = 80.0
+    pit_min_pct: float = 75.0
+    commands: dict[str, str] = field(default_factory=dict)
+    hot_paths: list[str] = field(
+        default_factory=lambda: ["**/hot/**", "**/perf/**", "*benchmark*", "*HotPath*"]
+    )
+    protected_paths: list[str] = field(
+        default_factory=lambda: [
+            "**/auth/**",
+            "**/payment/**",
+            "**/billing/**",
+            "**/migrate/**",
+            "**/migration/**",
+            "**/privacy/**",
+        ]
+    )
+
+    def __post_init__(self) -> None:
+        if self.commands is None:
+            self.commands = {}
+        if self.hot_paths is None:
+            self.hot_paths = []
+        if self.protected_paths is None:
+            self.protected_paths = []
+
+
+@dataclass
 class AutonomyCfg:
     # supervised = human spec gate. unattended = spec auto-approved and continue with no operator.
     profile: str = "supervised"
@@ -294,6 +328,7 @@ class DevLoopConfig:
     poller: PollerCfg = field(default_factory=PollerCfg)
     workflow: WorkflowCfg = field(default_factory=WorkflowCfg)
     autonomy: AutonomyCfg = field(default_factory=AutonomyCfg)
+    verification: VerificationCfg = field(default_factory=VerificationCfg)
     stages_enabled: dict[str, bool] = field(
         default_factory=lambda: {
             "spec": True,
@@ -393,6 +428,8 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
     pol_d = data.get("poller") if isinstance(data.get("poller"), dict) else {}
     wf_d = data.get("workflow") if isinstance(data.get("workflow"), dict) else {}
     aut_d = data.get("autonomy") if isinstance(data.get("autonomy"), dict) else {}
+    ver_d = data.get("verification") if isinstance(data.get("verification"), dict) else {}
+    ver_cmds = ver_d.get("commands") if isinstance(ver_d.get("commands"), dict) else {}
     snyk_d = q_d.get("snyk") if isinstance(q_d.get("snyk"), dict) else {}
     sonar_d = q_d.get("sonar") if isinstance(q_d.get("sonar"), dict) else {}
     mut_d = q_d.get("mutation") if isinstance(q_d.get("mutation"), dict) else {}
@@ -583,6 +620,17 @@ def load_config(path: Path | None = None) -> DevLoopConfig:
             continue_after_spec=bool(aut_d.get("continue_after_spec", False)),
             merge=str(aut_d.get("merge") or ""),
             ask_repo=bool(aut_d.get("ask_repo", True)),
+        ),
+        verification=VerificationCfg(
+            enabled=bool(ver_d.get("enabled", True)),
+            risk_class=str(ver_d.get("risk_class") or "normal"),
+            fix_cap=int(ver_d.get("fix_cap") or 2),
+            tiny_max_lines=int(ver_d.get("tiny_max_lines") or 40),
+            coverage_min_pct=float(ver_d.get("coverage_min_pct") or 80),
+            pit_min_pct=float(ver_d.get("pit_min_pct") or 75),
+            commands={str(k): str(v) for k, v in ver_cmds.items()},
+            hot_paths=_str_list(ver_d.get("hot_paths")) or VerificationCfg().hot_paths,
+            protected_paths=_str_list(ver_d.get("protected_paths")) or VerificationCfg().protected_paths,
         ),
     )
     return _apply_autonomy(cfg)

@@ -39,6 +39,14 @@ Isolation: `git.isolation: worktree` (default) uses native `git worktree` under 
 
 Eval (fake Jira): `python3 dev-loop/cli.py --config dev-loop/config.test.yaml eval --repo /path/to/lab-repo`
 
+Pre-production gates (static, ordered tests, boot smoke, new CVEs, artifact bundle) run inside `verify` before a PR. Risk class is `safe`, `normal`, or `sensitive` in config. Deploy, release, and post-release stay after merge.
+
+```bash
+python3 dev-loop/cli.py verify --repo /path/to/repo
+```
+
+The run dir then has `verify.log`, `verify-result.json` (`pr_allowed`), and `verify-bundle/`. A sensitive ticket also needs a person's name in `HUMAN_APPROVED` and threat-model plus pen-test sections in the spec. PIT floor starts at 75% killed, on the diff only.
+
 ## Layout
 
 | Path | Contents |

@@ -199,8 +199,45 @@ def cmd_verify(ns: argparse.Namespace) -> int:
     repo = Path(ns.repo).expanduser().resolve() if ns.repo else Path.cwd()
     repo = require_repo(repo, cfg)
     key = ns.key or load_state().get("ticket") or "LOCAL"
-    log = run_dir(str(key)) / "verify.log"
-    return run_verify(repo, cfg, log)
+    run = run_dir(str(key))
+    if not cfg.verification.enabled:
+        return run_verify(repo, cfg, run / "verify.log")
+    from gitutil import default_branch, is_git_repo, run_git
+    from verify_pipeline import run_for_config
+
+    changed: list[str] = []
+    if is_git_repo(repo):
+        base = default_branch(repo)
+        out = run_git(repo, "diff", "--name-only", f"{base}...HEAD", check=False)
+        changed = [line for line in out.splitlines() if line.strip()]
+        if not changed:
+            out = run_git(repo, "diff", "--name-only", "HEAD", check=False)
+            changed = [line for line in out.splitlines() if line.strip()]
+    spec = (run / "spec.md").read_text(encoding="utf-8") if (run / "spec.md").is_file() else ""
+    human = (run / "HUMAN_APPROVED").read_text(encoding="utf-8") if (run / "HUMAN_APPROVED").is_file() else ""
+    explicit = (run / "risk-class").read_text(encoding="utf-8").strip() if (run / "risk-class").is_file() else ""
+    result = run_for_config(
+        repo,
+        cfg,
+        run,
+        changed=changed,
+        spec=spec,
+        human_text=human,
+        explicit_risk=explicit,
+    )
+    rows = [
+        {"name": item.name, "stage": item.stage, "status": item.status, "detail": item.detail}
+        for item in result.checks
+    ]
+    doc = Document(
+        bin="cli.py",
+        description=f"verify {result.risk}: {result.reason}",
+        meta={"pr": "allowed" if result.pr_allowed else "blocked", "exit": str(result.exit_code)},
+        help=("Open the PR only when pr=allowed. The bundle is verify-bundle/ in the run dir.",),
+    )
+    doc.add_table("checks", ["stage", "name", "status", "detail"], rows)
+    print(emit(doc, fmt=_fmt(ns), full=_full(ns)), end="")
+    return int(result.exit_code or 0)
 
 
 def cmd_status(ns: argparse.Namespace) -> int:
