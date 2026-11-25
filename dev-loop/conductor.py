@@ -21,6 +21,7 @@ from ship import ensure_feature_branch, pr_body, ship_work
 from state import load_state, update_state
 from touched import changed_since, load_snapshot, save_snapshot, snapshot_tree
 from verify_infer import run_verify
+from verify_pipeline import fixer_violation, is_test_path, run_for_config
 from watch import add_watch
 from progress import backfill, record
 from treehouse import prepare_workspace, release_lease, workspace_for_run
@@ -167,6 +168,87 @@ def _maybe_adapter(stage: str, key: str, repo: Path, run: Path, cfg: DevLoopConf
     _mark_done(run)
 
 
+def _issue_labels(issue: dict) -> list[str]:
+    labels = issue.get("labels") or []
+    if isinstance(labels, str):
+        return [labels]
+    names: list[str] = []
+    for item in labels:
+        if isinstance(item, dict):
+            names.append(str(item.get("name") or ""))
+        else:
+            names.append(str(item))
+    return [name for name in names if name]
+
+
+def _save_defining(repo: Path, run: Path) -> None:
+    tree = snapshot_tree(repo)
+    defining = {rel: digest for rel, digest in tree.items() if is_test_path(rel)}
+    (run / "defining-tests.json").write_text(json.dumps(defining, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _floors(cfg: DevLoopConfig) -> dict[str, float]:
+    return {
+        "pit": float(cfg.verification.pit_min_pct),
+        "coverage": float(cfg.verification.coverage_min_pct),
+    }
+
+
+def _floors_after(cfg: DevLoopConfig, repo: Path, edited: set[str]) -> dict[str, float]:
+    floors = _floors(cfg)
+    for rel in edited:
+        if not rel.endswith((".yaml", ".yml", ".toml", ".json")):
+            continue
+        path = repo / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for key, pat in (
+            ("pit", r"pit_min_pct:\s*([0-9.]+)"),
+            ("coverage", r"coverage_min_pct:\s*([0-9.]+)"),
+        ):
+            match = re.search(pat, text)
+            if match:
+                floors[key] = float(match.group(1))
+    return floors
+
+
+def _guard_fixer(repo: Path, cfg: DevLoopConfig, run: Path, baseline: dict[str, str], pre_tree: dict[str, str]) -> str:
+    path = run / "defining-tests.json"
+    if not path.is_file():
+        return ""
+    before = json.loads(path.read_text(encoding="utf-8"))
+    post = snapshot_tree(repo)
+    after = {rel: post.get(rel, "") for rel in before}
+    ticket = {rel for rel, digest in pre_tree.items() if baseline.get(rel) != digest}
+    ticket.update(rel for rel in baseline if rel not in pre_tree)
+    edited = {rel for rel in set(pre_tree) | set(post) if pre_tree.get(rel) != post.get(rel)}
+    return fixer_violation(before, after, ticket, edited, _floors(cfg), _floors_after(cfg, repo, edited))
+
+
+def _run_gates(repo: Path, cfg: DevLoopConfig, run: Path, spec: str, issue: dict, snap_path: Path) -> tuple[int, str]:
+    """Return (exit code, action). action is ok, fail, or wait."""
+    if not cfg.verification.enabled:
+        rc = run_verify(repo, cfg, run / "verify.log")
+        return rc, "ok" if rc == 0 else "fail"
+    changed = changed_since(repo, load_snapshot(snap_path))
+    explicit = (run / "risk-class").read_text(encoding="utf-8").strip() if (run / "risk-class").is_file() else ""
+    human = (run / "HUMAN_APPROVED").read_text(encoding="utf-8") if (run / "HUMAN_APPROVED").is_file() else ""
+    outcome = run_for_config(
+        repo,
+        cfg,
+        run,
+        changed=changed,
+        spec=spec,
+        human_text=human,
+        explicit_risk=explicit,
+        labels=_issue_labels(issue),
+    )
+    if outcome.waiting_human:
+        return outcome.exit_code, "wait"
+    return outcome.exit_code, "ok" if outcome.exit_code == 0 else "fail"
+
+
 def start(key: str, repo: Path, cfg: DevLoopConfig | None = None) -> None:
     cfg = cfg or load_config()
     origin = require_repo(repo, cfg)
@@ -269,10 +351,14 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
             raise SystemExit("dev-loop: test-writer timed out")
         record(run, "test_writer", "ok", ticket=key)
 
+    if cfg.verification.enabled:
+        _save_defining(repo, run)
+
     verify_log = ""
     writer_n = max(1, cfg.caps.writer_retries)
     if cfg.stages_enabled.get("writer", True) or cfg.stages_enabled.get("verify", True):
         for attempt in range(1, writer_n + 1):
+            pre_tree = snapshot_tree(repo) if attempt > 1 and cfg.verification.enabled else {}
             if cfg.stages_enabled.get("writer", True):
                 update_state(stage="writer", ticket=key, attempt=attempt)
                 record(run, "writer", "started", ticket=key, note=f"attempt {attempt}")
@@ -281,10 +367,23 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                 _maybe_adapter("writer", key, repo, run, cfg, spec=spec, attempt=attempt)
                 if wait and not cfg.runtime.builtin_adapters and not wait_session_done(run, cfg):
                     raise SystemExit("dev-loop: writer timed out")
+                if attempt > 1 and cfg.verification.enabled:
+                    refused = _guard_fixer(repo, cfg, run, load_snapshot(snap_path), pre_tree)
+                    if refused:
+                        record(run, "verify", "fixer_refused", ticket=key, note=refused)
+                        print(f"dev-loop: fixer refused — {refused}")
+                        update_state(stage="fixer-refused")
+                        progress(cfg, key, "on_block", refused)
+                        return 1
             if not cfg.stages_enabled.get("verify", True):
                 break
-            rc = run_verify(repo, cfg, run / "verify.log")
+            rc, action = _run_gates(repo, cfg, run, spec, issue, snap_path)
             verify_log = (run / "verify.log").read_text(encoding="utf-8") if (run / "verify.log").is_file() else ""
+            if action == "wait":
+                record(run, "verify", "waiting_human", ticket=key, note="named human gate")
+                update_state(stage="waiting-human")
+                print(f"dev-loop: gates green. Write a name in `{run / 'HUMAN_APPROVED'}` before the PR.")
+                return rc
             if rc == 0:
                 record(run, "verify", "ok", ticket=key, note=f"attempt {attempt}")
                 break
@@ -306,7 +405,12 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
             record(run, "simplify", "timeout", ticket=key)
             raise SystemExit("dev-loop: simplify timed out")
         if cfg.stages_enabled.get("verify", True):
-            rc = run_verify(repo, cfg, run / "verify.log")
+            rc, action = _run_gates(repo, cfg, run, spec, issue, snap_path)
+            if action == "wait":
+                record(run, "verify", "waiting_human", ticket=key, note="named human gate")
+                update_state(stage="waiting-human")
+                print(f"dev-loop: gates green. Write a name in `{run / 'HUMAN_APPROVED'}` before the PR.")
+                return rc
             if rc != 0:
                 record(run, "verify", "failed", ticket=key, note="after simplify")
                 print("dev-loop: verify red after simplify; not opening a PR")
@@ -352,11 +456,17 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
             if v in set(cfg.review.pass_verdicts):
                 record(run, "review", "pass", ticket=key, note=v)
                 if cfg.stages_enabled.get("verify", True):
-                    rc = run_verify(repo, cfg, run / "verify.log")
+                    rc, action = _run_gates(repo, cfg, run, spec, issue, snap_path)
+                    if action == "wait":
+                        record(run, "verify", "waiting_human", ticket=key, note="named human gate")
+                        update_state(stage="waiting-human")
+                        print(f"dev-loop: gates green. Write a name in `{run / 'HUMAN_APPROVED'}` before the PR.")
+                        return rc
                     if rc != 0:
                         record(run, "verify", "failed_after_review", ticket=key, note=f"attempt {attempt}")
                         if attempt < review_n and cfg.stages_enabled.get("writer", True):
                             verify_log = (run / "verify.log").read_text(encoding="utf-8") if (run / "verify.log").is_file() else ""
+                            pre_tree = snapshot_tree(repo) if cfg.verification.enabled else {}
                             launch_prompt(
                                 writer_prompt(key, run, repo, spec, f"verify failed after review\n{verify_log}", lavish=lv.enabled),
                                 repo,
@@ -365,6 +475,14 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
                                 cfg,
                             )
                             _maybe_adapter("writer", key, repo, run, cfg, spec=spec, attempt=attempt)
+                            if cfg.verification.enabled:
+                                refused = _guard_fixer(repo, cfg, run, load_snapshot(snap_path), pre_tree)
+                                if refused:
+                                    record(run, "verify", "fixer_refused", ticket=key, note=refused)
+                                    print(f"dev-loop: fixer refused — {refused}")
+                                    update_state(stage="fixer-refused")
+                                    progress(cfg, key, "on_block", refused)
+                                    return 1
                             continue
                         print("dev-loop: verify red after review; not opening a PR")
                         update_state(stage="failed-verify")
@@ -375,8 +493,17 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
             if v in set(cfg.review.rewrite_verdicts) and attempt < review_n and cfg.stages_enabled.get("writer", True):
                 update_state(stage="writer")
                 _clear_stage_done(run)
+                pre_tree = snapshot_tree(repo) if cfg.verification.enabled else {}
                 launch_prompt(writer_prompt(key, run, repo, spec, f"review: {v}\n{verdict}", lavish=lv.enabled), repo, run, f"rewrite-{attempt}", cfg)
                 _maybe_adapter("writer", key, repo, run, cfg, spec=spec, attempt=attempt)
+                if cfg.verification.enabled:
+                    refused = _guard_fixer(repo, cfg, run, load_snapshot(snap_path), pre_tree)
+                    if refused:
+                        record(run, "verify", "fixer_refused", ticket=key, note=refused)
+                        print(f"dev-loop: fixer refused — {refused}")
+                        update_state(stage="fixer-refused")
+                        progress(cfg, key, "on_block", refused)
+                        return 1
                 continue
             break
 
@@ -386,10 +513,27 @@ def continue_loop(key: str, repo: Path | None = None, cfg: DevLoopConfig | None 
 
     rels = changed_since(repo, load_snapshot(snap_path))
     (run / "touched.txt").write_text("\n".join(rels) + ("\n" if rels else ""), encoding="utf-8")
-    body = pr_body(key, summary, spec, verdict, True, evidence=evidence_md)
+    bundle = ""
+    if cfg.verification.enabled:
+        result_path = run / "verify-result.json"
+        data: dict = {}
+        if result_path.is_file():
+            try:
+                data = json.loads(result_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data = {}
+        if not data.get("pr_allowed"):
+            reason = str(data.get("reason") or "verification gates did not pass")
+            stage = "waiting-human" if data.get("waiting_human") else "gates-blocked"
+            update_state(stage=stage, ticket=key)
+            record(run, "ship", "blocked", ticket=key, note=reason)
+            print(f"dev-loop: not opening a PR — {reason}")
+            return int(data.get("exit_code") or 1)
+        bundle = str(data.get("bundle") or "")
+    body = pr_body(key, summary, spec, verdict, True, evidence=evidence_md, bundle=bundle)
     (run / "pr.md").write_text(body, encoding="utf-8")
     try:
-        prs = ship_work(repo, rels, key, summary, spec, verdict, cfg, evidence=evidence_md)
+        prs = ship_work(repo, rels, key, summary, spec, verdict, cfg, evidence=evidence_md, bundle=bundle)
     except Exception as exc:  # noqa: BLE001
         branch = current_branch(repo)
         update_state(stage="ship-failed", error=str(exc), branch=branch)

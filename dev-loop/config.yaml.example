@@ -132,7 +132,39 @@ verify_fail_closed: true
 verify_timeout_sec: 1800
 
 
-# --- v2 gates (off until you opt in) ---
+# Pre-production gates (A–G). Risk class selects the suffix.
+# safe: static + unit + diff coverage. normal: A–C, coverage, PIT, new CVEs, artifacts.
+# sensitive: those, plus a named human. Threat model and pen test are spec sections, not scanners.
+# Deploy, release, and post-release are not ticket gates.
+verification:
+  enabled: true
+  risk_class: normal
+  fix_cap: 2
+  tiny_max_lines: 40
+  coverage_min_pct: 80
+  pit_min_pct: 75
+  commands: {}
+  # commands:
+  #   unit: ./gradlew test
+  #   contract: ./gradlew contractTest
+  #   pit: ./gradlew pitest
+  #   security: snyk test --json
+  #   nondocher: ./gradlew bootRun
+  #   health: http://127.0.0.1:8080/actuator/health
+  hot_paths:
+    - '**/hot/**'
+    - '**/perf/**'
+    - '*benchmark*'
+    - '*HotPath*'
+  protected_paths:
+    - '**/auth/**'
+    - '**/payment/**'
+    - '**/billing/**'
+    - '**/migrate/**'
+    - '**/migration/**'
+    - '**/privacy/**'
+
+# --- v2 gates (off; the verification block above is the ticket path) ---
 # PIT "survived" is mutants that were NOT killed (bad). Prefer metric: killed, min_pct: 75.
 # Do not set min_pct: 98 with metric: survived unless you really want almost no killing.
 

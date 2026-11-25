@@ -88,6 +88,7 @@ def pr_body(
     verdict: dict | None,
     verify_ok: bool,
     evidence: str = "",
+    bundle: str = "",
 ) -> str:
     v = verdict or {}
     lines = [
@@ -114,6 +115,8 @@ def pr_body(
         lines.extend(f"  - {r}" for r in risks)
     if evidence:
         lines.extend(["", "## Evidence", evidence[:4000]])
+    if bundle:
+        lines.extend(["", "## Verification bundle", bundle, ""])
     return "\n".join(lines) + "\n"
 
 
@@ -146,6 +149,7 @@ def ship_work(
     verdict: dict | None,
     cfg,
     evidence: str = "",
+    bundle: str = "",
 ) -> list[int]:
     """Stage loop-touched files, conventional commit, optional stacked PRs. Returns PR numbers."""
     msg = conventional_message(key, summary, spec.split("\n\n", 1)[0] if spec else "", commit_type=cfg.git.commit_type)
@@ -159,7 +163,7 @@ def ship_work(
             if not msg.endswith("\n"):
                 msg += "\n"
     title = cfg.git.pr_title_pattern.format(type=cfg.git.commit_type, summary=summary, key=key)
-    body = pr_body(key, summary, spec, verdict, True, evidence=evidence)
+    body = pr_body(key, summary, spec, verdict, True, evidence=evidence, bundle=bundle)
     prs: list[int] = []
     do_stack = bool(cfg.git.stack_prs and cfg.git.max_files_per_pr > 0 and len(rels) > cfg.git.max_files_per_pr)
     chunks = split_paths(rels, cfg.git.max_files_per_pr) if do_stack else [rels]

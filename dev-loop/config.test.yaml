@@ -91,6 +91,17 @@ health: {}
 verify_fail_closed: true
 verify_timeout_sec: 60
 
+# Pre-production gates. Eval lab is safe: static + unit + diff coverage. No docker, PIT, or CVE scan.
+verification:
+  enabled: true
+  risk_class: safe
+  fix_cap: 2
+  tiny_max_lines: 40
+  coverage_min_pct: 75
+  pit_min_pct: 75
+  commands:
+    coverage: python3 -c "print('diff coverage 100%')"
+
 quality:
   snyk:
     enabled: false

@@ -13,6 +13,13 @@ class ShipTests(unittest.TestCase):
     def test_given_summary_when_branch_name_then_feat_key_slug(self) -> None:
         self.assertEqual(branch_name("ASE-12", "Add Health Check!"), "feat/ASE-12-add-health-check")
 
+    def test_given_bundle_when_pr_body_then_links_it(self) -> None:
+        from ship import pr_body
+
+        body = pr_body("LAB-1", "sum", "spec", {"verdict": "good"}, True, bundle="runs/LAB-1/verify-bundle")
+        self.assertIn("runs/LAB-1/verify-bundle", body)
+        self.assertIn("Verification bundle", body)
+
     def test_given_summary_when_conventional_message_then_type_and_key(self) -> None:
         msg = conventional_message("ASE-12", "Add health check", "Do actuator.")
         self.assertTrue(msg.startswith("feat: Add health check (ASE-12)"))
